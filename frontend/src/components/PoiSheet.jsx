@@ -28,7 +28,7 @@ function VisibilityHint({ createdZoom, rules }) {
  *
  * mode: 'create' (draft = {lat, lon, zoom}) | 'view' | 'edit' (poi = Feature)
  */
-export default function PoiSheet({ mode, draft, poi, categories, rules, onSave, onDelete, onCancel, onEdit, onDraftChange }) {
+export default function PoiSheet({ mode, draft, poi, categories, rules, onSave, onDelete, onCancel, onEdit, onInfo, onDraftChange }) {
   const initial = poi
     ? { name: poi.properties.name, category: poi.properties.category, notes: poi.properties.notes }
     : { name: '', category: draft?.category ?? 'unknown', notes: '' }
@@ -102,6 +102,11 @@ export default function PoiSheet({ mode, draft, poi, categories, rules, onSave, 
           <button className="btn" onClick={onCancel}>
             Close
           </button>
+          {onInfo && (
+            <button className="btn" onClick={onInfo} aria-label="Location information for this POI">
+              ⓘ Info
+            </button>
+          )}
           <button className="btn primary" onClick={onEdit}>
             Edit
           </button>

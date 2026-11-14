@@ -128,6 +128,10 @@ export default function LegendPanel({ layers, layerState }) {
           {shown.map((l) => (
             <LegendCard key={l.id} layer={l} />
           ))}
+          <p className="legend-hint">
+            Colours are approximate. Tap or click the map (or ⓘ Info on a POI) for exact values with units and
+            sources.
+          </p>
         </div>
       )}
     </aside>

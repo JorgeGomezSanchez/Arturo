@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import FeatureLabels from './components/FeatureLabels'
 import Header from './components/Header'
 import LayersPanel from './components/LayersPanel'
@@ -8,6 +8,8 @@ import CreditsControl from './components/CreditsControl'
 import PoiLayer from './components/PoiLayer'
 import PoiPanel from './components/PoiPanel'
 import PoiSheet from './components/PoiSheet'
+import PointPanel from './components/PointPanel'
+import PointQuery from './components/PointQuery'
 import Sidebar from './components/Sidebar'
 import ZonesPanel from './components/ZonesPanel'
 import { useBackendData } from './hooks/useBackendData'
@@ -33,6 +35,9 @@ function MapApp({ data }) {
   const pois = usePois()
   const [poiUi, setPoiUi] = useState(null)
   const [draftLook, setDraftLook] = useState({})
+  // Location panel: { lat, lon, title?, poiId? } or null.
+  const [pointTarget, setPointTarget] = useState(null)
+  const closePoint = useCallback(() => setPointTarget(null), [])
 
   const rules = data.mapConfig.poiVisibility
   const colors = Object.fromEntries(data.poiCategories.map((c) => [c.id, c.color]))
@@ -50,13 +55,35 @@ function MapApp({ data }) {
   }, [map, placing])
 
   const startPlacing = () => {
+    setPointTarget(null)
     setDraftLook({})
     setPoiUi({ mode: 'placing' })
   }
   const openPoi = (poi) => {
     const [lon, lat] = poi.geometry.coordinates
     map?.flyTo([lat, lon], Math.max(poi.properties.createdZoom, data.mapConfig.minZoom), { duration: 1.2 })
+    setPointTarget(null)
     setPoiUi({ mode: 'view', id: poi.id })
+  }
+  // Tap on the map (idle or while a POI card is just being viewed).
+  const queryPoint = ({ lat, lon }) => {
+    if (poiUi?.mode === 'view') setPoiUi(null)
+    setPointTarget({ lat, lon })
+  }
+  const poiInfo = (poi) => {
+    const [lon, lat] = poi.geometry.coordinates
+    setPoiUi(null)
+    setPointTarget({ lat, lon, title: poi.properties.name, poiId: poi.id })
+  }
+  // Panel opened from a POI card: offer a way back to the card.
+  const pointPanelTarget = pointTarget && {
+    ...pointTarget,
+    onBack: pointTarget.poiId
+      ? () => {
+          setPoiUi({ mode: 'view', id: pointTarget.poiId })
+          setPointTarget(null)
+        }
+      : undefined,
   }
 
   const tabs = [
@@ -112,10 +139,18 @@ function MapApp({ data }) {
           rules={rules}
           colors={colors}
           selectedId={poiUi?.id}
-          onSelect={(poi) => setPoiUi({ mode: 'view', id: poi.id })}
+          onSelect={(poi) => {
+            setPointTarget(null)
+            setPoiUi({ mode: 'view', id: poi.id })
+          }}
           placing={placing}
           onPlace={(draft) => setPoiUi({ mode: 'create', draft })}
           draft={poiUi?.mode === 'create' ? { ...poiUi.draft, category: 'unknown', ...draftLook } : null}
+        />
+        <PointQuery
+          enabled={!poiUi || poiUi.mode === 'view'}
+          point={pointTarget}
+          onQuery={queryPoint}
         />
       </MarsMap>
 
@@ -131,7 +166,7 @@ function MapApp({ data }) {
       />
 
       {/* Floating action button: always reachable with a thumb */}
-      {!poiUi && (
+      {!poiUi && !pointTarget && (
         <button className="fab" onClick={startPlacing} aria-label="Add a point of interest">
           ＋ POI
         </button>
@@ -168,6 +203,7 @@ function MapApp({ data }) {
           categories={data.poiCategories}
           rules={rules}
           onEdit={() => setPoiUi({ mode: 'edit', id: current.id })}
+          onInfo={() => poiInfo(current)}
           onSave={async (body) => {
             await pois.update(current.id, body)
             setPoiUi({ mode: 'view', id: current.id })
@@ -178,6 +214,9 @@ function MapApp({ data }) {
           }}
           onCancel={() => setPoiUi(poiUi.mode === 'edit' ? { mode: 'view', id: current.id } : null)}
         />
+      )}
+      {pointPanelTarget && (
+        <PointPanel target={pointPanelTarget} onClose={closePoint} />
       )}
     </div>
   )
