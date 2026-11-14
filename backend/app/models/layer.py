@@ -38,6 +38,54 @@ class LayerTransform(BaseModel):
     nodata_to_transparent: bool = False
 
 
+class Coverage(BaseModel):
+    """Geographic extent with data (degrees). Outside it no tile is requested."""
+
+    south: float = Field(-90.0, ge=-90, le=90)
+    west: float = Field(-180.0, ge=-180, le=180)
+    north: float = Field(90.0, ge=-90, le=90)
+    east: float = Field(180.0, ge=-180, le=180)
+
+
+class LegendStop(BaseModel):
+    """One entry of a legend.
+
+    * gradient    -> ``color`` (+ optional ``value``/``label``) along a ramp
+    * categorical -> ``color`` + ``label`` (one class, e.g. a geologic unit)
+    * channels    -> ``color`` + ``label`` (meaning of an RGB channel)
+    """
+
+    color: str = Field(..., pattern=r"^#[0-9a-fA-F]{6}$")
+    label: str = ""
+    value: Optional[float] = None
+
+
+class LegendSource(BaseModel):
+    name: str
+    url: Optional[str] = None
+
+
+class Legend(BaseModel):
+    """How to READ a layer. Shown by the frontend as-is (it stays generic).
+
+    ``quantitative`` is False when the published tiles do not document an
+    exact colour->value mapping: the legend is then a qualitative guide
+    (e.g. "bright = warmer") and says so, instead of inventing numbers.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    type: Literal["gradient", "categorical", "channels", "symbol"] = "gradient"
+    title: str = ""
+    units: Optional[str] = None
+    quantitative: bool = False
+    min_label: Optional[str] = None
+    max_label: Optional[str] = None
+    stops: list[LegendStop] = []
+    notes: list[str] = []
+    sources: list[LegendSource] = []
+
+
 class LayerSource(BaseModel):
     """Remote source data. Only used by the remote provider."""
 
@@ -51,6 +99,19 @@ class LayerConfig(BaseModel):
     name: str
     description: str = ""
     group: Literal["base", "overlay"] = "base"
+    # Thematic category, used by the UI to group the layer control.
+    category: Literal[
+        "imagery", "topography", "thermal", "surface", "composition", "geology", "hydrology"
+    ] = "imagery"
+    # Shown when the app starts (the user can toggle it freely afterwards).
+    default_visible: bool = False
+    # CSS mix-blend-mode for the layer: "multiply" lets a greyscale
+    # hillshade darken whatever is underneath instead of covering it.
+    blend_mode: Literal["normal", "multiply", "screen", "overlay"] = "normal"
+    coverage: Coverage = Coverage()
+    # Approximate native resolution, for the UI ("~463 m/px").
+    resolution_m: Optional[float] = None
+    legend: Optional[Legend] = None
     format: Literal["jpg", "png"] = "jpg"
     tile_size: Literal[256, 512] = 256
     levels: LevelRange
@@ -91,6 +152,12 @@ class LayerOut(BaseModel):
     name: str
     description: str
     group: str
+    category: str
+    default_visible: bool
+    blend_mode: str
+    coverage: Coverage
+    resolution_m: Optional[float] = None
+    legend: Optional[Legend] = None
     tile_url: str = Field(
         ..., description="Template relative to the backend, with {z}/{x}/{y}"
     )
@@ -112,6 +179,12 @@ class LayerOut(BaseModel):
             name=layer.name,
             description=layer.description,
             group=layer.group,
+            category=layer.category,
+            default_visible=layer.default_visible,
+            blend_mode=layer.blend_mode,
+            coverage=layer.coverage,
+            resolution_m=layer.resolution_m,
+            legend=layer.legend,
             tile_url=f"{api_prefix}/tiles/{layer.id}/{{z}}/{{x}}/{{y}}",
             tile_size=layer.tile_size,
             zoom_offset=off,

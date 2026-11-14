@@ -19,8 +19,20 @@
 #  id            Unique identifier (goes in the URL: /api/tiles/{id}/...)
 #  name          Name shown in the UI
 #  description   Descriptive text for the UI / docs
-#  group         "base" (always visible, stacked by z_index) or
-#                "overlay" (toggleable layers; later phases)
+#  group         "base"    -> imagery the rest is drawn on (bottom of the
+#                             stack; on by default but can be toggled)
+#                "overlay" -> thematic layers drawn on top of the base
+#  category      Thematic group for the layer control: imagery |
+#                topography | thermal | surface | composition |
+#                geology | hydrology
+#  default_visible  Shown when the app starts (user can toggle freely)
+#  blend_mode    normal | multiply | screen | overlay (CSS mix-blend-mode).
+#                "multiply" makes a greyscale hillshade shade the layers
+#                underneath instead of hiding them.
+#  coverage      {south, west, north, east} with data; no tiles are
+#                requested outside it (default: whole planet)
+#  resolution_m  Approximate native resolution (metres/pixel), for the UI
+#  legend        How to READ the layer (see "Legends" below)
 #  format        Tile file extension: jpg | png
 #  tile_size     Pixel size of each source tile (256 or 512)
 #  levels        NATIVE source levels {min, max}. Above the max, the
@@ -35,6 +47,24 @@
 #                  underneath shows through.
 #  source        ONLY used by the backend in remote mode (never exposed):
 #                  url_template with {z} (level), {x} (column), {y} (row)
+#
+#  Legends
+#  -------
+#  type          gradient    -> colour ramp (stops from low to high)
+#                categorical -> one colour per class (e.g. geologic units)
+#                channels    -> meaning of each RGB channel
+#                symbol      -> what the drawn symbols mean (e.g. lines)
+#  title, units  Header of the legend
+#  quantitative  true ONLY if the colour->value mapping is documented.
+#                Otherwise the legend is a qualitative guide and the UI
+#                says so. We never invent numbers.
+#  min_label / max_label  Text at both ends of a gradient
+#  stops         [{color: "#rrggbb", label, value}]
+#  notes         Short interpretation hints (one line each)
+#  sources       [{name, url}] where the interpretation comes from
+#
+#  Colour stops of gradient legends were SAMPLED from the published
+#  tiles themselves (hue-sorted), so they match what is on screen.
 #  =====================================================================
 
 layers:
@@ -49,6 +79,9 @@ layers:
       Global colour mosaic from the Viking orbiters (USGS MDIM 2.1),
       ~232 m/pixel. Full planetary coverage.
     group: base
+    category: imagery
+    default_visible: true
+    resolution_m: 232
     format: jpg
     tile_size: 256
     levels: { min: 0, max: 7 }
@@ -74,6 +107,10 @@ layers:
       Global mosaic from the CTX camera (Mars Reconnaissance Orbiter),
       ~5 m/pixel, greyscale. No-data gaps are made transparent.
     group: base
+    category: imagery
+    default_visible: true
+    resolution_m: 5
+    coverage: { south: -88, west: -180, north: 88, east: 180 }
     format: png
     tile_size: 512
     levels: { min: 0, max: 12 }
