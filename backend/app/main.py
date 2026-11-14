@@ -14,15 +14,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import features, health, layers, map, point, pois, tiles
+from app.api import features, health, layers, map, point, pois, routes, tiles
 from app.catalog.map_config import get_map_config
 from app.catalog.registry import get_registry
+from app.catalog.routes_config import load_routes_config
 from app.core.config import get_settings
 from app.providers.factory import build_tile_provider
 from app.rasters.factory import build_raster_datasets, describe as describe_rasters
 from app.repositories.features import GeoJsonDirFeatureRepository
 from app.repositories.pois import build_poi_repository
+from app.repositories.routes import build_route_repository
 from app.services.point import PointService
+from app.services.route_analysis import RouteAnalyzer
 from app.services.tiles import TileService
 
 settings = get_settings()
@@ -51,6 +54,11 @@ async def lifespan(app: FastAPI):
     app.state.point_service = PointService(
         datasets, app.state.feature_repository, get_map_config().radius_m,
         app.state.point_raster, settings.rasters_dir,
+    )
+    # Routes: storage chosen by ROUTE_STORE; analysis on the same rasters.
+    app.state.route_repository = build_route_repository(settings)
+    app.state.route_analyzer = RouteAnalyzer(
+        datasets, app.state.feature_repository, load_routes_config(settings.routes_file)
     )
     yield
     await provider.close()
@@ -85,6 +93,7 @@ app.include_router(map.router, prefix="/api")
 app.include_router(features.router, prefix="/api")
 app.include_router(pois.router, prefix="/api")
 app.include_router(point.router, prefix="/api")
+app.include_router(routes.router, prefix="/api")
 
 
 @app.get("/", tags=["system"], summary="API index (what lives where)")

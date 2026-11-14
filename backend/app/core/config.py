@@ -77,6 +77,16 @@ class Settings(BaseSettings):
     poi_store_file: Path = BACKEND_DIR / "data" / "pois" / "pois.json"
 
     # ------------------------------------------------------------------
+    # ROUTES: hand-drawn routes, same storage abstraction as POIs.
+    #   ROUTE_STORE       json (file) | memory
+    #   ROUTE_STORE_FILE  file of the json store (not in git)
+    #   ROUTES_FILE       travel modes + hazard thresholds (routes.yaml)
+    # ------------------------------------------------------------------
+    route_store: Literal["json", "memory"] = "json"
+    route_store_file: Path = BACKEND_DIR / "data" / "routes" / "routes.json"
+    routes_file: Path = BACKEND_DIR / "app" / "catalog" / "routes.yaml"
+
+    # ------------------------------------------------------------------
     # POINT QUERIES (GET /api/point): numeric rasters (GeoTIFF).
     #   RASTERS_DIR       folder with the GeoTIFFs built by
     #                     scripts/build_rasters.py (coarse global grids
@@ -98,7 +108,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "layers_file", "map_file", "local_tiles_dir", "tile_cache_dir", "features_dir", "poi_store_file",
-        "rasters_dir", "rasters_file",
+        "rasters_dir", "rasters_file", "route_store_file", "routes_file",
     )
     @classmethod
     def _resolve_relative_to_backend(cls, value: Path) -> Path:

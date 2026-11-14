@@ -21,4 +21,5 @@ def health(request: Request) -> dict:
         "tileProvider": request.app.state.tile_provider.describe(),
         "poiStore": request.app.state.poi_repository.describe(),
         "pointRaster": request.app.state.point_raster,
+        "routeStore": request.app.state.route_repository.describe(),
     }
