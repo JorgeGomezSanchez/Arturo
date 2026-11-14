@@ -18,3 +18,6 @@ cache/
 data/tiles/*
 !data/tiles/.gitkeep
 !data/tiles/README.md
+
+# User POIs (personal data, created at runtime)
+data/pois/
