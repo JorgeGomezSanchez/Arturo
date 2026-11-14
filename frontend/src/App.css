@@ -556,3 +556,89 @@
     max-height: 40%;
   }
 }
+
+/* ---------- Feature labels (fonts must match FeatureLabels.jsx) ---------- */
+.leaflet-marker-icon.flabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  font: 500 12px system-ui, sans-serif;
+  color: #f6efe6;
+  /* dark halo keeps text readable over any layer */
+  text-shadow:
+    0 0 3px #000,
+    0 0 2px #000,
+    0 1px 2px #000;
+  cursor: pointer;
+}
+
+.flabel-mark {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: #f6efe6;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.75);
+}
+
+.leaflet-marker-icon.flabel-big {
+  font: 700 13px system-ui, sans-serif;
+}
+
+.leaflet-marker-icon.flabel-region {
+  justify-content: center;
+  font: 600 12px system-ui, sans-serif;
+  letter-spacing: 1.5px;
+  color: #f3d9b8;
+  font-style: italic;
+}
+
+.leaflet-marker-icon.flabel-site {
+  font: 700 12px system-ui, sans-serif;
+  color: #ffc48a;
+}
+
+.flabel-site .flabel-mark {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid #ff9a3c;
+  margin: 0;
+  filter: drop-shadow(0 0 1px #000);
+}
+
+.leaflet-marker-icon.flabel-ez {
+  font: 600 12px system-ui, sans-serif;
+  color: #9fe7ff;
+}
+
+.flabel-ez .flabel-mark {
+  border-radius: 1px;
+  transform: rotate(45deg);
+  background: #49c6f0;
+}
+
+.feature-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  font: 13px system-ui, sans-serif;
+}
+
+.feature-details p {
+  margin: 0.4rem 0;
+}
+
+.feature-details .small {
+  font-size: 11px;
+}
+
+.feature-details .muted {
+  color: #6b625a;
+}

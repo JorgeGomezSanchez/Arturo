@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import FeatureLabels from './components/FeatureLabels'
 import Header from './components/Header'
 import LayersPanel from './components/LayersPanel'
 import LegendPanel from './components/LegendPanel'
@@ -6,6 +7,7 @@ import MarsMap from './components/MarsMap'
 import Sidebar from './components/Sidebar'
 import ZonesPanel from './components/ZonesPanel'
 import { useBackendData } from './hooks/useBackendData'
+import { useLabelState } from './hooks/useLabelState'
 import { useLayerState } from './hooks/useLayerState'
 import './App.css'
 
@@ -14,12 +16,21 @@ function MapApp({ data }) {
   const [map, setMap] = useState(null)
   const [tab, setTab] = useState('layers')
   const layerState = useLayerState(data.layers)
+  const labels = useLabelState(data.featureCategories)
 
   const tabs = [
     {
       id: 'layers',
       label: 'Layers',
-      content: <LayersPanel layers={data.layers} layerState={layerState} />,
+      content: (
+        <LayersPanel
+          layers={data.layers}
+          layerState={layerState}
+          labelGroups={labels.groups}
+          labelState={labels.state}
+          onToggleLabels={labels.toggle}
+        />
+      ),
     },
     {
       id: 'zones',
@@ -35,7 +46,9 @@ function MapApp({ data }) {
         layers={data.layers}
         layerState={layerState}
         onMapReady={setMap}
-      />
+      >
+        <FeatureLabels enabled={labels.anyOn} categories={labels.categories} />
+      </MarsMap>
       <Sidebar
         header={<Header health={data.health} />}
         tabs={tabs}
