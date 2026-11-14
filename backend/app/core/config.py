@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Name shown in /docs and /api/health
     app_name: str = "Arturo API"
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
 
     # Layer catalog (which layers exist and where they come from)
     layers_file: Path = BACKEND_DIR / "app" / "catalog" / "layers.yaml"
@@ -59,11 +59,30 @@ class Settings(BaseSettings):
     remote_timeout_s: float = 15.0
     remote_user_agent: str = "Arturo/0.1 (NASA Space Apps 2026 project)"
 
+    # ------------------------------------------------------------------
+    # NAMED FEATURES (labels): folder with *.geojson files (IAU names,
+    # landing sites, exploration zones). Small static data shipped with
+    # the repo, so it is read from disk in BOTH modes (works offline).
+    # ------------------------------------------------------------------
+    features_dir: Path = BACKEND_DIR / "data" / "features"
+
+    # ------------------------------------------------------------------
+    # USER POIs (points of interest placed by hand)
+    #   json   -> one JSON file on disk (POI_STORE_FILE). Default.
+    #   memory -> in RAM, lost on restart (tests / throwaway demos).
+    # The rest of the backend only sees the PoiRepository interface,
+    # so a SQLite / habitat database can be plugged in later.
+    # ------------------------------------------------------------------
+    poi_store: Literal["json", "memory"] = "json"
+    poi_store_file: Path = BACKEND_DIR / "data" / "pois" / "pois.json"
+
     # Allowed CORS origins (comma separated). In development the frontend
     # uses the Vite proxy, so this is usually not needed.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    @field_validator("layers_file", "map_file", "local_tiles_dir", "tile_cache_dir")
+    @field_validator(
+        "layers_file", "map_file", "local_tiles_dir", "tile_cache_dir", "features_dir", "poi_store_file"
+    )
     @classmethod
     def _resolve_relative_to_backend(cls, value: Path) -> Path:
         """Relative paths are resolved against backend/, not the CWD."""

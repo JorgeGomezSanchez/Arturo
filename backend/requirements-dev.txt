@@ -1,3 +1,4 @@
 # Development / test dependencies (on top of requirements.txt)
 -r requirements.txt
 pytest>=8.0
+pyshp>=2.3                  # reads the IAU Gazetteer shapefile (scripts/build_features.py only)
