@@ -26,9 +26,10 @@ that the frontend never sees.
 8. [Offline tile packs](#8-offline-tile-packs)
 9. [Map labels (`/api/features`)](#9-map-labels-apifeatures)
 10. [Points of interest (`/api/pois`)](#10-points-of-interest-apipois)
-11. [Tests](#11-tests)
-12. [How to extend](#12-how-to-extend)
-13. [Troubleshooting](#13-troubleshooting)
+11. [Point queries (`/api/point`)](#11-point-queries-apipoint)
+12. [Tests](#12-tests)
+13. [How to extend](#13-how-to-extend)
+14. [Troubleshooting](#14-troubleshooting)
 
 ---
 
@@ -112,6 +113,10 @@ against the folder you launch from.
 | `FEATURES_DIR` | `./data/features` | Folder of label GeoJSON files. Every `*.geojson` in it is loaded at startup. |
 | `POI_STORE` | `json` | `json` = POIs saved in a file (survive restarts); `memory` = kept in RAM only (tests, demos). |
 | `POI_STORE_FILE` | `./data/pois/pois.json` | File used by the JSON store. Created on first write; not in git. |
+| `RASTERS_DIR` | `./data/rasters` | Numeric GeoTIFFs for `/api/point` (see [§11](#11-point-queries-apipoint)). |
+| `RASTERS_FILE` | `app/catalog/rasters.yaml` | Raster catalog: datasets, their sources in priority order, scale/offset, citations. |
+| `POINT_REMOTE_DEM` | `true` | Earth mode only: read the USGS 200 m DEM live (HTTP range requests) where no local 200 m crop exists. Ignored in Mars mode. |
+| `POINT_REMOTE_TIMEOUT_S` | `8` | Timeout of those remote reads; on failure the source is skipped for 5 minutes and MOLA is used. |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Allowed browser origins if the frontend is served from another origin without the Vite proxy. Methods GET, POST, PUT and DELETE are allowed. |
 
 ---
@@ -174,6 +179,7 @@ camelCase.
 | PUT | `/api/pois/{id}` | Replace a POI's fields (same body as POST). Keeps `id` and `createdAt`, updates `updatedAt`. |
 | DELETE | `/api/pois/{id}` | Delete → `204` (404 if unknown). |
 | GET | `/api/pois/categories` | The 5 POI icon types with label, description and colour. |
+| GET | `/api/point?lat=&lon=[&ls=][&tau=]` | Everything known about one location, from numeric GeoTIFFs and models: sections of `{value, unit, source, resolution, method, notes, noData, estimate}`. `lat` −90…90, `lon` −360…360 (wrapped), `ls` 0…<360 (default: today on Mars), `tau` 0…5 (default 0.5). See [§11](#11-point-queries-apipoint). |
 
 Example `GET /api/layers` item:
 
@@ -210,9 +216,11 @@ stays private in `layers.yaml`.
 Tile responses carry `Cache-Control: public, max-age=604800, immutable`
 and a debug header `X-Tile-Origin: remote | cache | local`.
 
-Planned for later phases (not implemented yet):
-`GET /api/point?lat=&lon=` (values of every data layer at a point, read
-from GeoTIFFs) and `POST /api/route` (A* route over slope/hazards).
+`/api/health` also reports `pointRaster`, e.g. `local GeoTIFF (6/7
+datasets) + remote 200 m DEM (USGS)`.
+
+Planned for a later phase: `POST /api/route` (A* route over
+slope/hazards).
 
 ---
 
@@ -223,10 +231,11 @@ backend/
 ├── app/
 │   ├── main.py              # creates the FastAPI app, CORS, routers, provider lifecycle
 │   ├── core/config.py       # Settings (env vars / .env)
-│   ├── api/                 # HTTP layer only (thin): health, layers, tiles, map, features, pois
+│   ├── api/                 # HTTP layer only (thin): health, layers, tiles, map, features, pois, point
 │   ├── catalog/
 │   │   ├── layers.yaml      # WHICH layers exist and where they come from
 │   │   ├── map.yaml         # initial view, zoom limits, detail zones
+│   │   ├── rasters.yaml     # numeric GeoTIFF datasets for /api/point (sources by priority)
 │   │   ├── registry.py      # loads/validates layers.yaml
 │   │   └── map_config.py    # loads map.yaml
 │   ├── models/              # Pydantic models (internal config vs public contract)
@@ -236,17 +245,28 @@ backend/
 │   │   ├── local.py         # LocalTileProvider   (Mars: folder on disk)
 │   │   ├── cached.py        # CachedTileProvider  (disk cache decorator)
 │   │   └── factory.py       # build_tile_provider(): the Earth/Mars switch
+│   ├── rasters/             # WHERE point values come from (twin of providers/)
+│   │   ├── base.py          # RasterSource interface + RasterWindow
+│   │   ├── geotiff.py       # GeoTIFF (local or /vsicurl/), multi-file, layered + circuit breaker
+│   │   └── factory.py       # build_raster_datasets(): remote only in Earth mode
 │   ├── repositories/
 │   │   ├── features.py      # FeatureRepository + GeoJSON-folder implementation
 │   │   └── pois.py          # PoiRepository + memory / JSON-file implementations
 │   └── services/
 │       ├── tiles.py         # TileService: validate → provider → transforms
 │       ├── transforms.py    # post-processing (e.g. transparent no-data)
-│       └── features.py      # label ranking: minZoom and priority per feature
+│       ├── features.py      # label ranking: minZoom and priority per feature
+│       ├── point.py         # PointService: assembles the /api/point sections
+│       ├── terrain.py       # slope (Horn), aspect, roughness
+│       ├── thermal.py       # 1-D surface temperature model
+│       ├── environment.py   # pressure, radiation, water boiling point
+│       └── mars_time.py     # Ls, Mars Year, local solar time (Mars24)
 ├── scripts/
 │   ├── prefetch_tiles.py    # builds offline tile packs
-│   └── build_features.py    # rebuilds the label GeoJSON from USGS / Mars Trek
+│   ├── build_features.py    # rebuilds the label GeoJSON from USGS / Mars Trek
+│   └── build_rasters.py     # builds data/rasters/*.tif from PDS / USGS / ASU originals
 ├── data/features/           # label GeoJSON (in git, ~0.8 MB) + README with sources
+├── data/rasters/            # numeric GeoTIFFs for /api/point (in git, ~61 MB) + README
 ├── data/pois/               # user POIs (pois.json, not in git)
 ├── data/tiles/              # offline packs (contents not in git)
 ├── cache/                   # remote-mode tile cache (not in git)
@@ -544,7 +564,140 @@ store only needs these 5 methods. `PoiNotFoundError` becomes HTTP 404.
 
 ---
 
-## 11. Tests
+## 11. Point queries (`/api/point`)
+
+Tap anywhere on the map (or **ⓘ Info** on a POI card) and the frontend
+calls `GET /api/point?lat=&lon=` (optional `&ls=0..360` for the season,
+`&tau=` for the dust opacity). The answer is **generic**: a list of
+sections, each a list of items, so new values never need frontend code.
+
+```json
+{
+  "query": { "lat": -4.5895, "lon": 137.4417, "ls": 21.9, "lsSource": "current",
+             "marsYear": 39, "localSolarTime": "14:28", "dataSource": "local GeoTIFF (6/7 datasets)" },
+  "sections": [
+    { "id": "terrain", "title": "Terrain", "items": [
+      { "id": "elevation", "label": "Elevation", "value": -4503, "unit": "m", "precision": 0,
+        "noData": false, "estimate": false,
+        "source": "HRSC+MOLA blended DEM v2 (local detail-zone crop)", "resolution": "~200 m/px",
+        "method": "Height above the Mars areoid (MOLA datum…)", "notes": "",
+        "series": null, "seriesX": "" } ] } ]
+}
+```
+
+| Section | Items (source) |
+|---|---|
+| Location | coordinates; smallest crater/patera the point is **inside**; mons/tholus it is **on**; nearest named feature; region (terra/planitia/planum…); nearest landing site and exploration zone with distance (IAU Gazetteer, `data/features/`); season (Ls, Mars Year) and local solar time (Mars24 algorithm). |
+| Terrain | elevation (200 m HRSC+MOLA crop → live USGS 200 m DEM in Earth mode → 463 m… 3.7 km MOLA MEGDR); slope + facing direction (Horn 3×3 on the DEM with metric spacing on the sphere); roughness (detrended RMS height over 5×5) and local relief. The baseline (3 or 5 pixels) is always stated. |
+| Thermal & climate | TES thermal inertia (night; day if built); **surface pressure** (model); **surface temperature max / min / now** with a curve over the sol (model); CO₂ frost point; THEMIS marked *no data* (its mosaics are contrast-stretched pictures, not temperatures). |
+| Surface & composition | TES Lambert albedo; dust cover index with interpretation; TES mineral abundances (plagioclase, high-Ca pyroxene, hematite, sheet silicates/high-Si glass, surface dust). |
+| Geology | SIM 3292 unit (code + name) and age. |
+| Radiation & safety | GCR dose per day and per Earth year, days to the NASA career limit (model); water boiling point; pressure-suit note. |
+
+Rules: every value carries `unit`, `source`, `resolution` and `method`;
+modelled values have `estimate: true`; outside a dataset's coverage, or
+when a dataset is not installed, the item has `noData: true` and the
+reason in `notes` (never a made-up number).
+
+### Data and the RasterSource abstraction
+
+The numbers come from compact GeoTIFFs in `data/rasters/` (≈ 61 MB in
+git; full table with URLs in [`data/rasters/README.md`](data/rasters/README.md)),
+built from the original PDS / USGS / ASU files by
+`python -m scripts.build_rasters` (reproducible; downloads cached in
+`data/rasters/_downloads/`, git-ignored). They are read with rasterio
+**windowed reads** (5×5 pixels per query, ~50 ms for a whole answer).
+
+`app/rasters/` mirrors the tile providers:
+
+| Class | Role |
+|---|---|
+| `RasterSource` (`base.py`) | Interface: `read(lat, lon, radius) -> RasterWindow` (NaN = no data, scale/offset applied, metric pixel size). |
+| `GeoTiffRasterSource` | One GeoTIFF: a local file, **or** an `https://` GeoTIFF through GDAL `/vsicurl/` HTTP range requests. |
+| `MultiFileRasterSource` | A glob of local crops (`zones/*_hrsc_mola_200m.tif`). |
+| `LayeredRasterSource` | Sources in priority order; the first with a valid centre value wins. A source that fails is skipped for 300 s (circuit breaker). |
+| `factory.py` | Builds the datasets from `app/catalog/rasters.yaml`. **Remote sources are only added when `DATA_SOURCE=remote` and `POINT_REMOTE_DEM=true`**, so Mars mode never goes online. |
+
+Earth → Mars needs no code change: in Mars mode the elevation falls back
+from the 200 m crops to the global MOLA grid, everything else is local
+already. A new source (e.g. a habitat database) is one class implementing
+`read()` plus an entry in `rasters.yaml`; the frontend does not change.
+
+### Models (all marked "est." in the UI)
+
+**Surface pressure** — `P = 610 Pa × exp(−h / 11.1 km)` (h = elevation
+above the areoid; scale height from the NASA Mars Fact Sheet). Annual
+mean; the CO₂ cycle changes it by ±10–15 %.
+
+**Surface temperature** (`services/thermal.py`) — a 1-D heat-conduction
+model of the ground, one sol at 15-minute steps after 12 spin-up sols:
+
+- Sunlight at the top of the atmosphere from the Mars–Sun distance and
+  the solar declination for the chosen Ls (obliquity 25.19°), times
+  cos(zenith) for each hour at the point's latitude.
+- Through dust of opacity τ = 0.5 (scaled with pressure): direct beam
+  `exp(−τ'/μ)` plus 75 % of the scattered light (dust scatters forward).
+- Absorbed = (1 − albedo) × that; plus a constant atmospheric infrared
+  term (2 % + 2 % × τ' of the noon sunlight).
+- Emission ε σ T⁴ (ε = 0.98). Conduction into 20+ layers down to several
+  seasonal skin depths, with conductivity from the TES thermal inertia
+  (ρc = 1.2 MJ m⁻³ K⁻¹). The surface node is solved implicitly together
+  with the ground, so the result does not depend on the time step.
+- The surface never goes below the CO₂ frost point at the local pressure
+  (James et al. 1992).
+- Validation: Gale at Ls 270 → ~275 K / 195 K (REMS: ~270–290 / 180–200);
+  Meridiani → ~283 / 177 K; Viking 1 at Ls 100 → ~259 / 183 K.
+- Limits: ±10–20 K; flat ground; clear weather; no seasonal memory, so
+  seasonal CO₂ frost and polar ice are not represented (the panel says
+  so above 55° latitude); missing albedo / inertia replaced by Mars
+  averages (also said in the notes).
+
+**Radiation** (`services/environment.py`) — galactic cosmic rays, quiet
+Sun, unshielded:
+
+```
+x    = P / g                    (g = 3.71 m/s², column of air in g/cm²)
+D(x) = D0 · exp(−x / L)         mSv/day
+D0   = 1.84 / 2 = 0.92          (RAD in cruise, Zeitlin et al. 2013, halved: the planet blocks half the sky)
+L    chosen so that D = 0.67 at the Curiosity landing elevation (RAD on the surface, Hassler et al. 2014)
+     → L ≈ 78 g/cm² with the pressure model above
+```
+
+Gives 0.67 mSv/day at Gale, ~0.62 on the floor of Hellas, ~0.89 on the
+summit of Olympus Mons. Crude (secondary particles make the real depth
+dependence flatter); ±30 % over the solar cycle; solar particle events
+and shielding not included. Treat as ±50 %. The yearly dose and the days
+to the 600 mSv NASA career limit (NASA-STD-3001) are derived from it.
+
+**Water** — boiling point at the local pressure from Clausius–Clapeyron
+anchored at the triple point (611.657 Pa, 0.01 °C); below that pressure
+liquid water cannot exist (reported as *no data* with that reason).
+
+### Sanity checks (real values vs `/api/point`)
+
+| Place | Published | Arturo |
+|---|---|---|
+| Curiosity landing, Gale | −4,501 m (MOLA); 0.67 mSv/day (RAD); ~700–900 Pa (REMS) | −4,503 m (200 m crop); 0.67 mSv/day; 915 Pa |
+| Jezero (Perseverance) | −2,569 m | −2,573 m |
+| Olympus Mons summit (17.34 N, 133.03 W) | ~21.2 km; ~70–100 Pa | 21,094 m (live 200 m DEM); 91 Pa; water cannot be liquid |
+| Hellas floor (40 S, 66 E) | ~−7 km; ~1,150 Pa; water boils ~9 °C | −6,968 m; 1,143 Pa; 9.1 °C |
+| North polar cap (85 N) | lApc unit; ice thermal inertia > 1,000 | lApc; 3,198 |
+
+### Optional data
+
+```bash
+python -m scripts.build_rasters --only ti_day --zones none                  # dayside thermal inertia (29 MB)
+python -m scripts.build_rasters --only elevation --zones arcadia,deuteronilus # more 200 m crops
+python -m scripts.build_rasters                                              # rebuild everything
+```
+
+`build_rasters.py` needs `pyshp` for the geology map (in
+`requirements-dev.txt`). Every builder documents its source URL at the
+top of the script.
+
+---
+
+## 12. Tests
 
 ```bash
 pip install -r requirements-dev.txt
@@ -561,9 +714,17 @@ POI storage (memory and JSON file, persistence across restarts) and the
 POI API (CRUD, validation errors, bbox filter). POIs are written to a
 temporary file during tests.
 
+`tests/test_point.py` writes tiny fixture GeoTIFFs (a tilted-plane DEM
+and a half-covered albedo map) into a temp folder and checks the
+`/api/point` shape, slope and aspect on the plane at two latitudes,
+*no data* outside coverage and for datasets that are not installed,
+`ls` / validation / longitude wrapping, NaN padding and layering, and
+the pressure, boiling-point, radiation, Mars-calendar (Mars24 reference
+epoch) and thermal-model numbers. No committed data, no network.
+
 ---
 
-## 12. How to extend
+## 13. How to extend
 
 ### Add a new raster layer (e.g. MOLA hillshade, THEMIS)
 
@@ -607,7 +768,7 @@ Implement `PoiRepository` (5 methods) and add a branch in
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -622,3 +783,7 @@ Implement `PoiRepository` (5 methods) and add a branch in
 | No labels on the map | Check `GET /api/features/categories`. If counts are 0, `FEATURES_DIR` points to the wrong folder. |
 | POIs vanish on restart | `POI_STORE=memory` is set; use `json`. |
 | `build_features.py` fails with `No module named shapefile` | `pip install -r requirements-dev.txt` (pyshp). |
+| `pip install` tries to compile rasterio / GDAL | Upgrade pip (`pip install -U pip`): rasterio ≥ 1.4.3 ships manylinux, macOS and Windows wheels with GDAL inside (1.5.x also for Python 3.14). No system GDAL is needed. |
+| `/api/point` says "Dataset not installed" | The GeoTIFF is missing from `RASTERS_DIR` (e.g. a partial clone): `git pull` or `python -m scripts.build_rasters --only <name>`. |
+| Point panel slow (1–2 s) in Earth mode away from Gale/Jezero | That is the live 200 m DEM over HTTP. Set `POINT_REMOTE_DEM=false` to use the local MOLA grid only, or build a local crop with `build_rasters.py --only elevation --zones <zone>`. |
+| A few CTX tiles near 80–88° N/S return 404 | Upstream sends some of them truncated; the backend treats them as no data so the Viking layer shows through. |
