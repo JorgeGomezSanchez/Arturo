@@ -7,14 +7,14 @@ const STATUS_LABEL = {
 
 /**
  * Side menu with the detail zones announced by GET /api/zones.
- * Clicking a zone flies the map to it.
+ * Tapping a zone flies the map to it. Rendered inside the sidebar's
+ * "Zones" tab.
  *
  * Phase 1: zones are a stub (status "planned"): auto-zoom works, but the
  * detailed layers (HiRISE, DTM, POIs, routes) arrive in later phases.
  * New zones appear here just by adding them to backend map.yaml.
  */
 export default function ZonesPanel({ map, zones, mapConfig }) {
-  const [open, setOpen] = useState(true)
   const [activeId, setActiveId] = useState(null)
 
   const flyToZone = (zone) => {
@@ -37,14 +37,9 @@ export default function ZonesPanel({ map, zones, mapConfig }) {
   }
 
   return (
-    <aside className="hud zones-panel">
-      <button className="zones-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span>Detail zones</span>
-        <span className="muted">{open ? '▾' : '▸'}</span>
-      </button>
-
-      {open && (
-        <ul className="zones-list">
+    <div className="zones-panel">
+      <p className="muted panel-hint">Tap a zone to fly there.</p>
+      <ul className="zones-list">
           <li>
             <button className="zone-item" onClick={flyHome}>
               <strong>Whole planet</strong>
@@ -68,8 +63,7 @@ export default function ZonesPanel({ map, zones, mapConfig }) {
               </button>
             </li>
           ))}
-        </ul>
-      )}
-    </aside>
+      </ul>
+    </div>
   )
 }

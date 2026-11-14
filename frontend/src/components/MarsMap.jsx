@@ -7,20 +7,32 @@ import CoordinatesReadout from './CoordinatesReadout'
 import HashView from './HashView'
 import { parseHash } from '../map/hash'
 
+const WHOLE_PLANET = { south: -90, west: -180, north: 90, east: 180 }
+
+function leafletBounds(coverage) {
+  // Only pass bounds when the layer does NOT cover the whole planet, so
+  // Leaflet skips requests for tiles that cannot exist (e.g. THEMIS poles).
+  const c = coverage ?? WHOLE_PLANET
+  const whole = c.south <= -90 && c.north >= 90 && c.west <= -180 && c.east >= 180
+  return whole
+    ? undefined
+    : [
+        [c.south, c.west],
+        [c.north, c.east],
+      ]
+}
+
 /**
  * Full-screen Mars map.
  *
  * It renders WHATEVER layers the backend announces: it does not know what
- * Viking or CTX are, nor where their tiles come from. Every Leaflet option
- * (tile size, zoom offset, native zoom range...) comes from /api/layers.
+ * Viking, CTX or THEMIS are, nor where their tiles come from. Every
+ * Leaflet option (tile size, zoom offset, native zoom range, coverage,
+ * blend mode...) comes from /api/layers; visibility, opacity and order
+ * come from the user's layer state.
  */
-export default function MarsMap({ mapConfig, layers, onMapReady, children }) {
+export default function MarsMap({ mapConfig, layers, layerState, onMapReady, children }) {
   const crs = useMemo(() => createMarsCrs(mapConfig.radiusM), [mapConfig.radiusM])
-
-  const baseLayers = useMemo(
-    () => layers.filter((l) => l.group === 'base').sort((a, b) => a.zIndex - b.zIndex),
-    [layers],
-  )
 
   const { minZoom, maxZoom, bounds } = mapConfig
   // Initial view: the URL hash if present (#zoom/lat/lon), else the backend default.
@@ -28,6 +40,8 @@ export default function MarsMap({ mapConfig, layers, onMapReady, children }) {
     const fromHash = parseHash()
     return fromHash ?? { zoom: mapConfig.zoom, lat: mapConfig.center.lat, lon: mapConfig.center.lon }
   }, [mapConfig])
+
+  const visibleLayers = layers.filter((l) => layerState.settings[l.id]?.visible)
 
   return (
     <MapContainer
@@ -51,7 +65,7 @@ export default function MarsMap({ mapConfig, layers, onMapReady, children }) {
       attributionControl
     >
       <ZoomControl position="topright" />
-      {baseLayers.map((layer) => (
+      {visibleLayers.map((layer) => (
         <TileLayer
           key={layer.id}
           url={apiUrl(layer.tileUrl)}
@@ -61,8 +75,10 @@ export default function MarsMap({ mapConfig, layers, onMapReady, children }) {
           maxNativeZoom={layer.maxNativeZoom}
           minZoom={layer.minZoom}
           maxZoom={layer.maxZoom}
-          opacity={layer.opacity}
-          zIndex={layer.zIndex}
+          bounds={leafletBounds(layer.coverage)}
+          opacity={layerState.settings[layer.id].opacity}
+          zIndex={layerState.zIndexOf(layer.id)}
+          className={layer.blendMode && layer.blendMode !== 'normal' ? `blend-${layer.blendMode}` : ''}
           attribution={layer.attribution}
           // Keep a few more tiles around so zooming feels smoother.
           keepBuffer={4}

@@ -1,14 +1,52 @@
 import { useState } from 'react'
 import Header from './components/Header'
+import LayersPanel from './components/LayersPanel'
 import MarsMap from './components/MarsMap'
+import Sidebar from './components/Sidebar'
 import ZonesPanel from './components/ZonesPanel'
 import { useBackendData } from './hooks/useBackendData'
+import { useLayerState } from './hooks/useLayerState'
 import './App.css'
+
+function MapApp({ data }) {
+  // Leaflet map instance, shared with panels that live outside the map.
+  const [map, setMap] = useState(null)
+  const [tab, setTab] = useState('layers')
+  const layerState = useLayerState(data.layers)
+
+  const tabs = [
+    {
+      id: 'layers',
+      label: 'Layers',
+      content: <LayersPanel layers={data.layers} layerState={layerState} />,
+    },
+    {
+      id: 'zones',
+      label: 'Zones',
+      content: <ZonesPanel map={map} zones={data.zones} mapConfig={data.mapConfig} />,
+    },
+  ]
+
+  return (
+    <div className="app">
+      <MarsMap
+        mapConfig={data.mapConfig}
+        layers={data.layers}
+        layerState={layerState}
+        onMapReady={setMap}
+      />
+      <Sidebar
+        header={<Header health={data.health} />}
+        tabs={tabs}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
+    </div>
+  )
+}
 
 export default function App() {
   const data = useBackendData()
-  // Leaflet map instance, shared with panels that live outside the map.
-  const [map, setMap] = useState(null)
 
   if (data.status === 'loading') {
     return <div className="screen-message">Loading Mars…</div>
@@ -22,14 +60,5 @@ export default function App() {
       </div>
     )
   }
-
-  return (
-    <div className="app">
-      <MarsMap mapConfig={data.mapConfig} layers={data.layers} onMapReady={setMap} />
-      <div className="sidebar">
-        <Header health={data.health} />
-        <ZonesPanel map={map} zones={data.zones} mapConfig={data.mapConfig} />
-      </div>
-    </div>
-  )
+  return <MapApp data={data} />
 }
