@@ -7,3 +7,4 @@
 fastapi>=0.110,<1.0          # API framework (automatic docs at /docs)
 uvicorn[standard]>=0.29      # ASGI server that runs FastAPI
 pydantic-settings>=2.2       # typed configuration from environment variables / .env
+pyyaml>=6.0                  # reads the layer catalog (app/catalog/*.yaml)

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     app_name: str = "Arturo API"
     app_version: str = "0.1.0"
 
+    # Layer catalog (which layers exist and where they come from)
+    layers_file: Path = BACKEND_DIR / "app" / "catalog" / "layers.yaml"
+
     # Allowed CORS origins (comma separated). In development the frontend
     # uses the Vite proxy, so this is usually not needed.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

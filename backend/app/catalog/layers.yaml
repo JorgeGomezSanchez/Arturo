@@ -1,0 +1,87 @@
+# =====================================================================
+#  ARTURO LAYER CATALOG
+# =====================================================================
+#  This file is the SINGLE source of truth about which layers exist.
+#  The frontend knows nothing about NASA: it asks GET /api/layers for
+#  the list and renders whatever is here. Adding/changing a layer =
+#  editing this YAML (and, for a new kind of source, checking that the
+#  provider understands it).
+#
+#  Tile grid (shared by every layer)
+#  ---------------------------------
+#  Equirectangular projection ("flat" lat/lon, EPSG:4326-like) with the
+#  origin at the top-left corner (-180, 90). At level 0 the planet is
+#  2 tiles wide x 1 tile tall; every level doubles both numbers.
+#  This is exactly NASA Mars Trek's WMTS "default028mm" scheme.
+#
+#  Fields of each layer
+#  --------------------
+#  id            Unique identifier (goes in the URL: /api/tiles/{id}/...)
+#  name          Name shown in the UI
+#  description   Descriptive text for the UI / docs
+#  group         "base" (always visible, stacked by z_index) or
+#                "overlay" (toggleable layers; later phases)
+#  format        Tile file extension: jpg | png
+#  tile_size     Pixel size of each source tile (256 or 512)
+#  levels        NATIVE source levels {min, max}. Above the max, the
+#                viewer upscales the last available tile.
+#  display       MAP zoom range where the layer is shown {min_zoom, max_zoom}
+#  opacity       0..1
+#  z_index       Stacking order (higher = on top)
+#  attribution   Mandatory data credits
+#  transform     Optional post-processing applied by the backend:
+#                  nodata_to_transparent: true -> pure black pixels
+#                  (gaps with no data) become transparent so the layer
+#                  underneath shows through.
+#  source        ONLY used by the backend in remote mode (never exposed):
+#                  url_template with {z} (level), {x} (column), {y} (row)
+#  =====================================================================
+
+layers:
+  # -------------------------------------------------------------------
+  # Global colour base: Viking MDIM 2.1 (~232 m/pixel)
+  # Covers the WHOLE planet (poles included); it is what you see when
+  # zoomed out. Native levels 0-7; beyond that it is upscaled under CTX.
+  # -------------------------------------------------------------------
+  - id: viking_mdim21_color
+    name: "Viking MDIM 2.1 (colour, global)"
+    description: >-
+      Global colour mosaic from the Viking orbiters (USGS MDIM 2.1),
+      ~232 m/pixel. Full planetary coverage.
+    group: base
+    format: jpg
+    tile_size: 256
+    levels: { min: 0, max: 7 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 1.0
+    z_index: 1
+    attribution: "Viking MDIM 2.1: NASA/JPL/USGS · via NASA Mars Trek"
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
+
+  # -------------------------------------------------------------------
+  # Detail: global CTX mosaic (~5 m/pixel, greyscale)
+  # Covers ~99 % of the planet between ±88° latitude, with some gaps.
+  # Mars Trek publishes it in its WMTS pointing to Esri's service
+  # (astro.arcgis.com, in collaboration with Caltech's Murray Lab).
+  # 512 px tiles, native levels 0-12 (level 12 ≈ 5 m/pixel).
+  # Only shown at high zoom: at low zoom the mosaic is normalised
+  # (flat grey) and the Viking colour mosaic looks much better.
+  # -------------------------------------------------------------------
+  - id: ctx_global_5m
+    name: "CTX global (5 m/pixel)"
+    description: >-
+      Global mosaic from the CTX camera (Mars Reconnaissance Orbiter),
+      ~5 m/pixel, greyscale. No-data gaps are made transparent.
+    group: base
+    format: png
+    tile_size: 512
+    levels: { min: 0, max: 12 }
+    display: { min_zoom: 7, max_zoom: 18 }
+    opacity: 1.0
+    z_index: 2
+    attribution: "CTX: NASA/JPL/MSSS/Caltech Murray Lab/Esri · via NASA Mars Trek"
+    transform:
+      nodata_to_transparent: true
+    source:
+      url_template: "https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}"
