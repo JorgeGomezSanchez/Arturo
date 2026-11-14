@@ -1,0 +1,225 @@
+{
+ "source": "Tanaka et al. 2014, Geologic map of Mars, USGS SIM 3292",
+ "units": [
+  {
+   "value": 1,
+   "code": "AHi",
+   "name": "Amazonian and Hesperian impact unit"
+  },
+  {
+   "value": 2,
+   "code": "AHtu",
+   "name": "Amazonian and Hesperian transition undivided unit"
+  },
+  {
+   "value": 3,
+   "code": "AHv",
+   "name": "Amazonian and Hesperian volcanic"
+  },
+  {
+   "value": 4,
+   "code": "ANa",
+   "name": "Amazonian and Noachian apron unit"
+  },
+  {
+   "value": 5,
+   "code": "Aa",
+   "name": "Amazonian apron unit"
+  },
+  {
+   "value": 6,
+   "code": "Ap",
+   "name": "Amazonian polar unit"
+  },
+  {
+   "value": 7,
+   "code": "Apu",
+   "name": "Amazonian polar undivided unit"
+  },
+  {
+   "value": 8,
+   "code": "Av",
+   "name": "Amazonian volcanic unit"
+  },
+  {
+   "value": 9,
+   "code": "Ave",
+   "name": "Amazonian volcanic edifice"
+  },
+  {
+   "value": 10,
+   "code": "HNb",
+   "name": "Hesperian and Noachian basin unit"
+  },
+  {
+   "value": 11,
+   "code": "HNhu",
+   "name": "Hesperian and Noachian highland undivided unit"
+  },
+  {
+   "value": 12,
+   "code": "HNt",
+   "name": "Hesperian and Noachian transition unit"
+  },
+  {
+   "value": 13,
+   "code": "Hp",
+   "name": "Hesperian polar unit"
+  },
+  {
+   "value": 14,
+   "code": "Hpe",
+   "name": "Hesperian polar edifice unit"
+  },
+  {
+   "value": 15,
+   "code": "Hpu",
+   "name": "Hesperian polar undivided unit"
+  },
+  {
+   "value": 16,
+   "code": "Ht",
+   "name": "Hesperian transition unit"
+  },
+  {
+   "value": 17,
+   "code": "Hto",
+   "name": "Hesperian transition outflow unit"
+  },
+  {
+   "value": 18,
+   "code": "Htu",
+   "name": "Hesperian transition undivided unit"
+  },
+  {
+   "value": 19,
+   "code": "Hve",
+   "name": "Hesperian volcanic edifice unit"
+  },
+  {
+   "value": 20,
+   "code": "Nhe",
+   "name": "Noachian highland edifice unit"
+  },
+  {
+   "value": 21,
+   "code": "Nhu",
+   "name": "Noachian highland undivided unit"
+  },
+  {
+   "value": 22,
+   "code": "Nve",
+   "name": "Noachian volcanic edifice unit"
+  },
+  {
+   "value": 23,
+   "code": "eAb",
+   "name": "Early Amazonian basin unit"
+  },
+  {
+   "value": 24,
+   "code": "eHb",
+   "name": "Early Hesperian basin unit"
+  },
+  {
+   "value": 25,
+   "code": "eHh",
+   "name": "Early Hesperian highland unit"
+  },
+  {
+   "value": 26,
+   "code": "eHt",
+   "name": "Early Hesperian transition unit"
+  },
+  {
+   "value": 27,
+   "code": "eHv",
+   "name": "Early Hesperian volcanic unit"
+  },
+  {
+   "value": 28,
+   "code": "eNh",
+   "name": "Early Noachian highland unit"
+  },
+  {
+   "value": 29,
+   "code": "eNhm",
+   "name": "Early Noachian highland massif unit"
+  },
+  {
+   "value": 30,
+   "code": "lAa",
+   "name": "Late Amazonian apron unit"
+  },
+  {
+   "value": 31,
+   "code": "lApc",
+   "name": "Late Amazonian polar cap unit"
+  },
+  {
+   "value": 32,
+   "code": "lApd",
+   "name": "Late Amazonian polar dunes unit"
+  },
+  {
+   "value": 33,
+   "code": "lAv",
+   "name": "Late Amazonian volcanic unit"
+  },
+  {
+   "value": 34,
+   "code": "lAvf",
+   "name": "Late Amazonian volcanic field unit"
+  },
+  {
+   "value": 35,
+   "code": "lHb",
+   "name": "Late Hesperian basin unit"
+  },
+  {
+   "value": 36,
+   "code": "lHl",
+   "name": "Late Hesperian lowland unit"
+  },
+  {
+   "value": 37,
+   "code": "lHt",
+   "name": "Late Hesperian transition unit"
+  },
+  {
+   "value": 38,
+   "code": "lHv",
+   "name": "Late Hesperian volcanic unit"
+  },
+  {
+   "value": 39,
+   "code": "lHvf",
+   "name": "Late Hesperian volcanic field unit"
+  },
+  {
+   "value": 40,
+   "code": "lNh",
+   "name": "Late Noachian highland unit"
+  },
+  {
+   "value": 41,
+   "code": "lNv",
+   "name": "Late Noachian volcanic unit"
+  },
+  {
+   "value": 42,
+   "code": "mAl",
+   "name": "Middle Amazonian lowland unit"
+  },
+  {
+   "value": 43,
+   "code": "mNh",
+   "name": "Middle Noachian highland unit"
+  },
+  {
+   "value": 44,
+   "code": "mNhm",
+   "name": "Middle Noachian highland massif unit"
+  }
+ ]
+}
