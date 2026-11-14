@@ -216,7 +216,10 @@ def build_albedo(dl: Path, out: Path) -> None:
     src = download(URLS["albedo"], dl / "tes_albedo_7410m.tif")
     with rasterio.open(src) as d:
         a = d.read(1)
-        valid = (a > 0) & (a < 1)
+        # The mosaic is 8-bit quantised between 0.06 and 0.32: the lowest
+        # step (0.06) is the fill used poleward of ~87° and in gaps, and
+        # 0.32 is a saturation ceiling (polar ice is brighter).
+        valid = (a > 0.0605) & (a < 1)
     write_tif(out / "tes_albedo_8ppd.tif", to_uint16(a, 1e-4, valid), ppd=8, nodata=65535,
               tags={"scale_factor": 1e-4, "units": "1", "source": URLS["albedo"]})
 
