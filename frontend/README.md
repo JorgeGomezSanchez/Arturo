@@ -191,6 +191,37 @@ The App keeps a small state machine (`idle → placing → create | view →
 edit`) in `App.jsx`. All POI calls go through `hooks/usePois.js` →
 `api/client.js`.
 
+### Location panel (tap the map)
+
+A tap or click on the map opens the **location panel** with everything
+the backend knows about that point (`GET /api/point`). **ⓘ Info** on a
+POI card opens the same panel at the POI, titled with its name, with a
+**← POI** button back to the card.
+
+- `components/PointQuery.jsx` turns map clicks into queries and draws the
+  ring marker. It waits 280 ms so a double-click / double-tap zoom does
+  not open the panel; it is off while a POI is being placed or edited;
+  taps on labels and POI markers keep doing their own thing (Leaflet
+  markers do not bubble to the map), and the tap that closes a label
+  popup only closes it. It pans the map just enough to keep the marker
+  visible next to the panel / above the bottom sheet.
+- `components/PointPanel.jsx` is a **generic renderer**: it draws the
+  `sections[].items[]` it receives and hard-codes no value. Each row
+  shows label, value and unit, an **est.** badge for modelled values,
+  *No data* when missing, and a small source · resolution line; tapping
+  the row reveals the method and notes. Items with a `series` get a
+  sparkline (`components/Sparkline.jsx`), e.g. the temperature over one
+  sol with a dashed "now" line. A **Season for estimates** selector
+  re-queries with a chosen Ls (default: today on Mars). The previous
+  answer stays on screen, dimmed, while the next one loads; errors show
+  a *Retry* button; `Esc` or ✕ closes.
+- Layout: a 380 px side panel on the right on desktop (over the
+  legend), a bottom sheet covering the lower 62 % on screens ≤ 700 px.
+  Touch targets are ≥ 44 px. The ＋ POI button hides while it is open.
+
+The legend panel ends with a hint that colours are approximate and exact
+values are one tap away.
+
 ### Layout
 
 `components/Sidebar.jsx` has three tabs: **Layers**, **POIs** and
@@ -220,6 +251,17 @@ it.
 ---
 
 ## 4. Features
+
+Phase 2:
+
+- Tap or click anywhere → location panel with location, terrain,
+  thermal & climate, surface & composition, geology and radiation &
+  safety values, each with unit, source and resolution (see *Location
+  panel*).
+- **ⓘ Info** on every POI card opens the same panel for the POI.
+- Season selector for the temperature estimates; sparkline of the
+  temperature over a sol.
+- Side panel on desktop, bottom sheet on phones.
 
 Phase 1b:
 
@@ -279,6 +321,9 @@ frontend/
         ├── PoiIcon.jsx       # icon used in lists and forms
         ├── PoiSheet.jsx      # create / view / edit / delete sheet
         ├── PoiPanel.jsx      # POIs tab (list, fly-to)
+        ├── PointQuery.jsx    # map tap → location query + marker
+        ├── PointPanel.jsx    # generic /api/point renderer (side panel / bottom sheet)
+        ├── Sparkline.jsx     # tiny SVG curve for an item's series
         ├── CoordinatesReadout.jsx
         ├── HashView.jsx      # keeps the view in the URL hash
         ├── Header.jsx        # title + Earth/Mars badge
