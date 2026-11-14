@@ -45,9 +45,77 @@
   color: #a8a097;
 }
 
-.header {
+.sidebar {
+  position: absolute;
+  z-index: 1000;
   top: 12px;
   left: 12px;
+  width: 270px;
+  max-height: calc(100% - 80px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Panels inside the sidebar flow normally instead of floating */
+.sidebar .hud {
+  position: static;
+}
+
+.zones-panel {
+  overflow-y: auto;
+  padding: 0.4rem;
+}
+
+.zones-toggle,
+.zone-item {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.zones-toggle {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0.45rem;
+  font-weight: 600;
+}
+
+.zones-list {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+
+.zone-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.45rem;
+}
+
+.zone-item:hover,
+.zone-item:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.zone-item.active {
+  background: rgba(240, 160, 112, 0.16);
+  outline: 1px solid rgba(240, 160, 112, 0.4);
+}
+
+.zone-status {
+  font-size: 11px;
+}
+
+.status-planned {
+  color: #d8b46a;
+}
+
+.status-available {
+  color: #7fd18b;
 }
 
 .header h1 {

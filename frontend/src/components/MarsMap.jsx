@@ -14,7 +14,7 @@ import { parseHash } from '../map/hash'
  * Viking or CTX are, nor where their tiles come from. Every Leaflet option
  * (tile size, zoom offset, native zoom range...) comes from /api/layers.
  */
-export default function MarsMap({ mapConfig, layers, children }) {
+export default function MarsMap({ mapConfig, layers, onMapReady, children }) {
   const crs = useMemo(() => createMarsCrs(mapConfig.radiusM), [mapConfig.radiusM])
 
   const baseLayers = useMemo(
@@ -31,6 +31,7 @@ export default function MarsMap({ mapConfig, layers, children }) {
 
   return (
     <MapContainer
+      ref={onMapReady}
       className="mars-map"
       crs={crs}
       center={[initial.lat, initial.lon]}
