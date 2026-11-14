@@ -497,3 +497,124 @@ layers:
         - { name: "Kreslavsky & Head (2000), JGR 105(E11), 26695-26711", url: "https://doi.org/10.1029/2000JE001259" }
     source:
       url_template: "https://trek.nasa.gov/tiles/Mars/EQ/mola_roughness/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  # -------------------------------------------------------------------
+  # COMPOSITION (TES mineral abundance maps, Bandfield 2002)
+  # -------------------------------------------------------------------
+  - id: tes_high_ca_pyroxene
+    name: "High-Ca pyroxene abundance (TES)"
+    description: >-
+      Concentration of high-calcium pyroxene (a basalt mineral) from TES spectra deconvolution, 4 pixels/degree. Highest in Syrtis Major and other dark equatorial regions.
+    group: overlay
+    category: composition
+    resolution_m: 16000
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.7
+    z_index: 40
+    attribution: "TES mineral maps: NASA/JPL/ASU (Bandfield 2002) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "High-Ca pyroxene (areal fraction)"
+      quantitative: false
+      min_label: "Low (≈ 0)"
+      max_label: "High (≈ 0.20)"
+      stops:
+        - { color: "#5000d1" }
+        - { color: "#2c49ed" }
+        - { color: "#1eb9e1" }
+        - { color: "#21d578" }
+        - { color: "#93e017" }
+        - { color: "#f4cf00" }
+        - { color: "#ff8d01" }
+        - { color: "#ff200c" }
+      notes:
+        - "Only dark equatorial regions exceed the detection limit (0.10-0.20); bright dusty regions show 0-0.05."
+        - "Rainbow ramp, blue = low, red = high. Range from the product description (Bandfield 2002); exact colour stops are not published with the tiles."
+        - "Very coarse (4 pixels/degree ≈ 16 km). Transparent = no data."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global High-Ca pyroxene abundance", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Bandfield (2002), Global mineral distributions on Mars, JGR 107(E6), 5042", url: "https://doi.org/10.1029/2001JE001510" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Clinopyroxene/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: tes_plagioclase
+    name: "Plagioclase abundance (TES)"
+    description: >-
+      Concentration of plagioclase feldspar from TES spectra deconvolution, 4 pixels/degree. High in low-albedo (dark) regions, highest in Syrtis Major.
+    group: overlay
+    category: composition
+    resolution_m: 16000
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.7
+    z_index: 41
+    attribution: "TES mineral maps: NASA/JPL/ASU (Bandfield 2002) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Plagioclase feldspar (areal fraction)"
+      quantitative: false
+      min_label: "Low (≈ 0)"
+      max_label: "High (≈ 0.20)"
+      stops:
+        - { color: "#5000d1" }
+        - { color: "#2c49ed" }
+        - { color: "#1eb9e1" }
+        - { color: "#21d578" }
+        - { color: "#93e017" }
+        - { color: "#f4cf00" }
+        - { color: "#ff8d01" }
+        - { color: "#ff200c" }
+      notes:
+        - "Dark equatorial regions 0.10-0.20, dark high-latitude regions 0.05-0.15, bright regions 0-0.05 (below detection)."
+        - "Rainbow ramp, blue = low, red = high. Range from the product description (Bandfield 2002); exact colour stops are not published with the tiles."
+        - "Very coarse (4 pixels/degree ≈ 16 km). Transparent = no data."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global Plagioclase abundance", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Bandfield (2002), Global mineral distributions on Mars, JGR 107(E6), 5042", url: "https://doi.org/10.1029/2001JE001510" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Plagioclase/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: tes_sheet_silicates_glass
+    name: "Sheet silicates / high-Si glass (TES)"
+    description: >-
+      Concentration of the sheet-silicate / high-silica-glass end-member group from TES spectra, 4 pixels/degree. Noisier than the other mineral maps (spectrally similar to dust).
+    group: overlay
+    category: composition
+    resolution_m: 16000
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.7
+    z_index: 42
+    attribution: "TES mineral maps: NASA/JPL/ASU (Bandfield 2002) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Sheet silicates + high-Si glass (areal fraction)"
+      quantitative: false
+      min_label: "Low (≈ 0)"
+      max_label: "High (≈ 0.20)"
+      stops:
+        - { color: "#5000d1" }
+        - { color: "#2c49ed" }
+        - { color: "#1eb9e1" }
+        - { color: "#21d578" }
+        - { color: "#93e017" }
+        - { color: "#f4cf00" }
+        - { color: "#ff8d01" }
+        - { color: "#ff200c" }
+      notes:
+        - "Highest in northern low-albedo regions (0.05-0.20). Possible clays are of interest as water-related minerals."
+        - "Rainbow ramp, blue = low, red = high. Range from the product description (Bandfield 2002); exact colour stops are not published with the tiles."
+        - "Very coarse (4 pixels/degree ≈ 16 km). Transparent = no data."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global Sheet silicates / high-Si glass", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Bandfield (2002), Global mineral distributions on Mars, JGR 107(E6), 5042", url: "https://doi.org/10.1029/2001JE001510" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Glass_Clay/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
