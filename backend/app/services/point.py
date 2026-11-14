@@ -32,6 +32,9 @@ NOT_PLACES = {"landing_site", "exploration_zone", "albedo"}
 # Roughly circular features: "inside" is meaningful for them. Elongated
 # ones (valles, fossae, mensae...) are only reported as "nearest".
 ROUND_CATEGORIES = {"crater", "patera"}
+# Volcanoes and mountains: "on" when well inside their IAU circle.
+EDIFICE_CATEGORIES = {"mons", "tholus"}
+EDIFICE_INNER = 0.8
 
 MINERAL_LABELS = {
     "plagioclase": "Plagioclase feldspar",
@@ -158,7 +161,7 @@ class PointService:
         )]
         if len(self._feats):
             dist = self._distances_km(lat, lon)
-            inside, region, nearest = None, None, None
+            inside, region, nearest, on = None, None, None, None
             for i in np.argsort(dist):
                 f = self._feats[i]
                 p = f.properties
@@ -173,6 +176,9 @@ class PointService:
                     if is_region:
                         if region is None or p.diameter_km < region[0].properties.diameter_km:
                             region = (f, d)
+                    elif p.category in EDIFICE_CATEGORIES and d <= EDIFICE_INNER * r:
+                        if on is None or p.diameter_km < on[0].properties.diameter_km:
+                            on = (f, d)
                     elif p.category in ROUND_CATEGORIES and (
                             inside is None or p.diameter_km < inside[0].properties.diameter_km):
                         inside = (f, d)
@@ -184,7 +190,14 @@ class PointService:
                     source=src, notes=f"{d:.0f} km from its centre.",
                     method="Smallest named crater or patera whose circle (IAU centre and diameter) contains the point.",
                 ))
-            if nearest and (not inside or nearest[0].id != inside[0].id):
+            if on:
+                f, d = on
+                items.append(PointItem(
+                    id="on", label="On", value=f"{f.properties.name} ({f.properties.type_label.lower()}, {f.properties.diameter_km:.0f} km)",
+                    source=src, notes=f"{d:.0f} km from its centre.",
+                    method="Smallest named mons / tholus whose IAU circle (centre, diameter) contains the point well inside (80 % of its radius).",
+                ))
+            if nearest and all(nearest[0].id != x[0].id for x in (inside, on) if x):
                 f, d = nearest
                 items.append(PointItem(
                     id="nearest_feature", label="Nearest named feature",
@@ -328,6 +341,7 @@ class PointService:
         if pressure is not None:
             items.append(PointItem(
                 id="pressure", label="Surface pressure (annual mean)", value=round(pressure), unit="Pa", estimate=True,
+                source="Model from the elevation above (scale height: NASA Mars Fact Sheet)",
                 method=f"P = {env.P0_PA:.0f} Pa × exp(−h / {env.SCALE_HEIGHT_M / 1000:.1f} km), from the elevation.",
                 notes="Changes ±10-15 % over the year as CO₂ freezes onto and returns from the polar caps. Earth sea level: 101,325 Pa.",
             ))
@@ -348,22 +362,25 @@ class PointService:
         method = ("1-D heat-conduction model of the ground over one sol with the surface energy balance "
                   "(sunlight through dust, CO₂ atmosphere infrared, thermal radiation, CO₂ frost point). "
                   "Error typically ±10-20 K. Not a measurement.")
+        model_src = "Arturo 1-D thermal model, inputs from the TES and MOLA maps above"
         series = [SeriesPoint(x=h, y=round(t - 273.15, 1)) for h, t in tr.hourly]
         for key, label, val in (("t_max", "Surface temperature, daytime max", tr.t_max),
                                 ("t_min", "Surface temperature, night min", tr.t_min)):
             items.append(PointItem(
                 id=key, label=label, value=round(val - 273.15), unit="°C", estimate=True,
-                method=method, notes=f"{val:.0f} K. {assumptions}",
+                method=method, source=model_src, notes=f"{val:.0f} K. {assumptions}",
                 series=series if key == "t_max" else None, series_x="local solar hour" if key == "t_max" else "",
             ))
         if lst_now is not None:
             t_now = tr.at_hour(lst_now)
             items.append(PointItem(
                 id="t_now", label="Surface temperature now", value=round(t_now - 273.15), unit="°C", estimate=True,
+                source=model_src,
                 method="Same model, at the current local solar time.", notes=f"{t_now:.0f} K at {hhmm(lst_now)} local solar time.",
             ))
         items.append(PointItem(
             id="co2_frost_point", label="CO₂ frost point", value=round(tr.frost_point - 273.15), unit="°C", estimate=True,
+            source="James et al. 1992 (Mars, Univ. Arizona Press), at the estimated pressure",
             method="James et al. (1992) at the local pressure.",
             notes="Below this the atmosphere itself freezes out as CO₂ frost.",
         ))
@@ -402,6 +419,7 @@ class PointService:
             PointItem(
                 id="radiation_dose", label="Radiation dose, cosmic rays", value=round(dose, 2), precision=2,
                 unit="mSv/day", estimate=True,
+                source="Model anchored to MSL Curiosity RAD (Hassler et al. 2014, Zeitlin et al. 2013)",
                 method=(f"D = {env.RAD_TOP_MSV_DAY:.2f} × exp(−x / {env.ATTENUATION_G_CM2:.0f} g/cm²) with x = P/g = "
                         f"{x:.1f} g/cm² of air above you; anchored to Curiosity RAD at Gale (0.67 mSv/day, "
                         "Hassler et al. 2014) and RAD in cruise (1.84 mSv/day, halved for the planet's shadow)."),
@@ -409,7 +427,7 @@ class PointService:
             ),
             PointItem(
                 id="radiation_year", label="Dose over one Earth year here", value=round(dose * 365.25), unit="mSv",
-                estimate=True, method="Daily dose × 365.25.",
+                estimate=True, method="Daily dose × 365.25.", source="Same radiation model",
                 notes=f"NASA career limit: {env.NASA_CAREER_LIMIT_MSV:.0f} mSv (NASA-STD-3001, 2022), reached after ~{env.NASA_CAREER_LIMIT_MSV / max(dose, 1e-9):,.0f} days unshielded.",
             ),
         ]
@@ -417,12 +435,14 @@ class PointService:
         items.append(PointItem(
             id="water_boiling", label="Water boils at", value=None if boil is None else round(boil - 273.15, 1),
             precision=1, unit="°C", estimate=True, no_data=boil is None,
+            source="Clausius-Clapeyron, at the estimated pressure",
             method="Clausius-Clapeyron from water's triple point (611.657 Pa, 0.01 °C) at the estimated pressure.",
             notes=("Pressure is below water's triple point: ice sublimates, liquid water cannot exist." if boil is None
                    else "Liquid water could only exist briefly between 0 °C and this temperature."),
         ))
         items.append(PointItem(
             id="pressure_suit", label="Pressure suit", value="Required", estimate=False,
+            source="Armstrong limit (human physiology)",
             notes=f"Pressure ~{p:.0f} Pa is far below the Armstrong limit (6,300 Pa), where body fluids boil at 37 °C.",
         ))
         return items
