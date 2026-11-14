@@ -1,0 +1,116 @@
+# =====================================================================
+#  Route analysis: travel modes and hazard thresholds
+# =====================================================================
+#  Used by POST /api/routes/analyze and when a route is saved. The
+#  frontend never hard-codes a threshold: it shows what the backend
+#  reports (GET /api/routes/config exposes this file).
+#
+#  Severity levels: info < warning < danger.
+#  Values are ASSUMPTIONS for planning, with the reasoning next to each
+#  one. Change them here; no code changes are needed.
+# =====================================================================
+
+sampling:
+  # Samples are spaced at the resolution of the best elevation data
+  # available along the route, but never closer than min_spacing_m and
+  # never more than max_samples in total (long routes get coarser).
+  min_spacing_m: 50
+  max_samples: 2500
+  # Live remote DEM (Earth mode only): every block row is one HTTP
+  # request on the USGS 200 m DEM (one row per strip). Blocks taller
+  # than remote_max_rows are read from the overviews, and if that would
+  # need more than remote_max_decimation x, the remote DEM is skipped
+  # and MOLA (local) is used instead.
+  remote_max_rows: 80
+  remote_max_decimation: 2
+  # How many points along the route run the (slow) thermal model; the
+  # rest is interpolated.
+  thermal_points: 16
+
+modes:
+  walking:
+    label: "On foot (EVA suit)"
+    # Apollo moonwalks averaged roughly 1-3 km/h including stops; a
+    # suited walk on Mars (0.38 g, rocks, ~120 kg of suit and kit) is
+    # planned here at 2 km/h on flat ground.
+    speed_kmh: 2.0
+    # Speed vs grade: Tobler's hiking function, normalised to 1 on flat
+    # ground (fastest on a gentle descent, slower up and down hill).
+    speed_model: tobler
+    slope:
+      # Terrain slope (steepest direction), from the DEM.
+      # Assumption: Apollo 15/16 crews found ~10-15 deg slopes on loose
+      # regolith very tiring in their suits; loose granular material
+      # avalanches near its angle of repose (~30-35 deg), so >25 deg is
+      # treated as not walkable.
+      difficult_deg: 15
+      impassable_deg: 25
+    # Longest planned excursion outside a pressurised vehicle or habitat:
+    # ISS and Apollo EVAs lasted up to ~7-8 h.
+    max_duration_h: 8
+  rover:
+    label: "Pressurised rover"
+    # Apollo LRV: ~8 km/h typical, 13 km/h top speed.
+    speed_kmh: 8.0
+    speed_model: linear   # speed falls linearly to 20 % at the impassable grade
+    slope:
+      # Apollo LRV design limit: climb and descend slopes up to 25 deg.
+      # Curiosity / Perseverance planners treat ~15-20 deg as the start
+      # of risky terrain because of slip and tilt.
+      difficult_deg: 15
+      impassable_deg: 25
+    max_duration_h: 10
+    # Apollo "walk-back" rule: never drive farther from the base than
+    # the crew can walk back if the rover fails (~10 km on the Moon).
+    walk_back_km: 10
+
+hazards:
+  # Along-track grade (climb/descent in the travel direction).
+  grade_deg:
+    info: 8
+    warning: 15
+  # Roughness = RMS height left after removing the best-fit plane in a
+  # 5x5-pixel window. It grows with the window size, so the thresholds
+  # are given for a 1 km window (5 x 200 m) and scaled for other data as
+  # (window / 1 km) ^ hurst, with a Hurst exponent of ~0.7 typical of
+  # Martian topography at km scales (e.g. Orosei et al. 2003).
+  # At 200 m it describes km-scale hummocks and gullies, not boulders.
+  roughness_m:
+    warning: 15
+    danger: 40
+    reference_window_m: 1000
+    hurst: 0.7
+  # Thermal inertia below this = fine loose dust/sand: poor traction,
+  # wheels can sink (Spirit was trapped in soft soil in 2009).
+  soft_ground_ti:
+    warning: 100
+  # Dust cover index below this = surface mantled by fine dust
+  # (Ruff & Christensen 2002: <= 0.94 dusty).
+  dust_dci:
+    warning: 0.94
+  # Estimated night minimum surface temperature (thermal model).
+  night_temperature_c:
+    warning: -100
+    danger: -120
+  # Estimated surface pressure (annual mean from elevation).
+  low_pressure_pa:
+    info: 400
+    warning: 200
+  # Galactic cosmic ray dose rate (scaled from Curiosity RAD).
+  dose_rate_msv_day:
+    warning: 0.8
+  # Dose accumulated during the traversal.
+  route_dose_msv:
+    warning: 1.0
+    danger: 10.0
+  # Elevation data coarser than this along the route: local slopes can be
+  # much steeper than the DEM shows.
+  coarse_data_m:
+    info: 1000
+  # Crossing the rim of a named IAU crater (rims are steep and blocky).
+  crater_rim:
+    min_diameter_km: 1.0
+    warning_diameter_km: 5.0
+  # Samples without elevation data.
+  no_data:
+    severity: warning
