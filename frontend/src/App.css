@@ -642,3 +642,322 @@
 .feature-details .muted {
   color: #6b625a;
 }
+
+/* ---------- Buttons ---------- */
+.btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8e2da;
+}
+
+.btn.primary {
+  background: #c8693c;
+  color: #fff;
+}
+
+.btn.danger {
+  color: #ff8f8f;
+}
+
+.btn.danger.confirm {
+  background: #b83232;
+  color: #fff;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn:focus-visible,
+.fab:focus-visible {
+  outline: 2px solid #f0a070;
+  outline-offset: 2px;
+}
+
+.small {
+  font-size: 11px;
+}
+
+.form-error {
+  color: #ff9b85;
+}
+
+/* ---------- POI markers on the map ---------- */
+.leaflet-marker-icon.poi-marker {
+  background: none;
+  border: none;
+}
+
+.poi-pin {
+  width: 34px;
+  height: 34px;
+  box-sizing: border-box;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--poi-color, #777);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.poi-pin svg {
+  transform: rotate(45deg);
+}
+
+.poi-marker.selected .poi-pin {
+  box-shadow:
+    0 0 0 3px #f0a070,
+    0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.poi-name {
+  position: absolute;
+  top: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 17, 24, 0.85);
+  color: #fff;
+  font: 600 12px system-ui, sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.poi-dot div {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--poi-color, #777);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Bigger invisible tap area around the small dot */
+.poi-dot::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+
+.mars-map.placing,
+.mars-map.placing .leaflet-interactive {
+  cursor: crosshair;
+}
+
+/* ---------- POI badge (panels, forms) ---------- */
+.poi-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--poi-color, #777);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-sizing: border-box;
+}
+
+/* ---------- Floating action button + placing banner ---------- */
+.fab {
+  all: unset;
+  position: absolute;
+  z-index: 1000;
+  right: 16px;
+  bottom: 84px;
+  min-width: 64px;
+  height: 56px;
+  padding: 0 18px;
+  box-sizing: border-box;
+  border-radius: 28px;
+  background: #c8693c;
+  color: #fff;
+  font: 700 16px system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.placing-banner {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border-color: rgba(240, 160, 112, 0.6);
+}
+
+/* ---------- POI sheet (create / view / edit) ---------- */
+.poi-sheet {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100% - 24px));
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  padding: 0.9rem 1rem;
+  font-size: 14px;
+  z-index: 1100;
+}
+
+.poi-sheet h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.poi-sheet-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.poi-notes {
+  white-space: pre-wrap;
+}
+
+.cat-picker {
+  border: none;
+  margin: 10px 0 4px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.cat-picker legend {
+  padding: 0;
+  margin-bottom: 6px;
+  color: #a8a097;
+  font-size: 12px;
+}
+
+.cat-tile {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cat-tile.active {
+  border-color: var(--poi-color);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cat-tile:focus-visible {
+  outline: 2px solid #f0a070;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #a8a097;
+}
+
+.field input,
+.field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f6efe6;
+  font: 15px system-ui, sans-serif; /* >= 15px avoids iOS zoom-on-focus */
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: 2px solid #f0a070;
+  border-color: transparent;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sheet-actions .spacer {
+  flex: 1;
+}
+
+/* ---------- POIs tab ---------- */
+.poi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.poi-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.poi-item {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.poi-item > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.poi-item:focus-visible,
+.poi-item:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 700px) {
+  .cat-tile span {
+    font-size: 10px;
+  }
+  .fab {
+    bottom: 96px;
+  }
+}
