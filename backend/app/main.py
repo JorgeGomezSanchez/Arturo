@@ -14,13 +14,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import features, health, layers, map, pois, tiles
+from app.api import features, health, layers, map, point, pois, tiles
 from app.catalog.map_config import get_map_config
 from app.catalog.registry import get_registry
 from app.core.config import get_settings
 from app.providers.factory import build_tile_provider
+from app.rasters.factory import build_raster_datasets, describe as describe_rasters
 from app.repositories.features import GeoJsonDirFeatureRepository
 from app.repositories.pois import build_poi_repository
+from app.services.point import PointService
 from app.services.tiles import TileService
 
 settings = get_settings()
@@ -41,8 +43,20 @@ async def lifespan(app: FastAPI):
     )
     # User POIs: storage chosen by POI_STORE (json file by default).
     app.state.poi_repository = build_poi_repository(settings)
+    # Point queries: numeric GeoTIFFs behind the RasterSource abstraction
+    # (local files; Earth mode may add the remote 200 m DEM).
+    datasets = build_raster_datasets(settings)
+    app.state.raster_datasets = datasets
+    app.state.point_raster = describe_rasters(datasets)
+    app.state.point_service = PointService(
+        datasets, app.state.feature_repository, get_map_config().radius_m,
+        app.state.point_raster, settings.rasters_dir,
+    )
     yield
     await provider.close()
+    for ds in datasets.values():
+        if ds.source:
+            ds.source.close()
 
 
 app = FastAPI(
@@ -70,6 +84,7 @@ app.include_router(tiles.router, prefix="/api")
 app.include_router(map.router, prefix="/api")
 app.include_router(features.router, prefix="/api")
 app.include_router(pois.router, prefix="/api")
+app.include_router(point.router, prefix="/api")
 
 
 @app.get("/", tags=["system"], summary="API index (what lives where)")
@@ -86,5 +101,6 @@ def root() -> dict:
         "docs": "/docs",
         "openapi": "/openapi.json",
         "health": "/api/health",
+        "point": "/api/point?lat=-4.59&lon=137.44",
         "frontend": "Run the frontend (npm run dev) and open http://localhost:5173",
     }
