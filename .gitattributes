@@ -1,0 +1,4 @@
+# Normalize line endings (the team uses Windows, Linux and macOS)
+* text=auto eol=lf
+*.jpg binary
+*.png binary
