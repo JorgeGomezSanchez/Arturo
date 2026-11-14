@@ -50,7 +50,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -59,3 +59,21 @@ app.include_router(health.router, prefix="/api")
 app.include_router(layers.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
 app.include_router(map.router, prefix="/api")
+
+
+@app.get("/", tags=["system"], summary="API index (what lives where)")
+def root() -> dict:
+    """Small index so opening the backend URL in a browser is not a bare 404.
+
+    The real API lives under ``/api``; the interactive docs under ``/docs``.
+    The map itself is served by the frontend (Vite, port 5173).
+    """
+    return {
+        "app": settings.app_name,
+        "version": settings.app_version,
+        "api": "/api",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "health": "/api/health",
+        "frontend": "Run the frontend (npm run dev) and open http://localhost:5173",
+    }

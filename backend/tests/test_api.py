@@ -62,3 +62,8 @@ def test_map_and_zones(client):
     assert m["crs"] == "EPSG4326" and m["body"] == "Mars"
     zones = {z["id"]: z for z in client.get("/api/zones").json()}
     assert "gale" in zones and zones["gale"]["center"]["lat"] < 0
+
+
+def test_root_is_an_api_index(client):
+    body = client.get("/").json()
+    assert body["docs"] == "/docs" and body["api"] == "/api"
