@@ -108,6 +108,12 @@
 }
 
 .tab-content {
+  /* flex child of .tab-panel: min-height 0 lets it shrink below its
+     content, so it scrolls inside the sidebar instead of stretching the
+     sidebar (and the page) past the bottom of the screen. */
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative; /* clip absolutely positioned descendants too */
   overflow-y: auto;
   margin-top: 6px;
   padding: 0 0.2rem 0.2rem;
@@ -299,6 +305,12 @@
 }
 
 .layer-toggle {
+  /* Containing block for the hidden checkbox below. Without it the
+     absolutely positioned input escaped the scrolling .tab-content (its
+     containing block was the .tab-panel, because backdrop-filter makes
+     one), so off-screen inputs grew the page and focusing one on click
+     scrolled the whole document. */
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
@@ -310,6 +322,9 @@
 /* Visually hidden native checkbox, styled switch next to it */
 .layer-toggle input {
   position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
   opacity: 0;
   width: 1px;
   height: 1px;
