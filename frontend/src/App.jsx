@@ -4,6 +4,7 @@ import Header from './components/Header'
 import LayersPanel from './components/LayersPanel'
 import LegendPanel from './components/LegendPanel'
 import MarsMap from './components/MarsMap'
+import CreditsControl from './components/CreditsControl'
 import PoiLayer from './components/PoiLayer'
 import PoiPanel from './components/PoiPanel'
 import PoiSheet from './components/PoiSheet'
@@ -120,6 +121,14 @@ function MapApp({ data }) {
 
       <Sidebar header={<Header health={data.health} />} tabs={tabs} activeTab={tab} onTabChange={setTab} />
       <LegendPanel layers={data.layers} layerState={layerState} />
+      <CreditsControl
+        map={map}
+        layers={data.layers}
+        layerState={layerState}
+        labelGroups={labels.groups}
+        labelState={labels.state}
+        labelCredits={data.mapConfig.labelCredits}
+      />
 
       {/* Floating action button: always reachable with a thumb */}
       {!poiUi && (

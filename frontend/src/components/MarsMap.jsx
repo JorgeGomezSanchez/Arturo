@@ -62,7 +62,9 @@ export default function MarsMap({ mapConfig, layers, layerState, onMapReady, chi
       worldCopyJump
       zoomSnap={1}
       zoomControl={false}
-      attributionControl
+      // Credits are shown by our compact CreditsControl instead of
+      // Leaflet's attribution bar, which wrapped over the scale bar.
+      attributionControl={false}
     >
       <ZoomControl position="topright" />
       {visibleLayers.map((layer) => (
@@ -79,7 +81,6 @@ export default function MarsMap({ mapConfig, layers, layerState, onMapReady, chi
           opacity={layerState.settings[layer.id].opacity}
           zIndex={layerState.zIndexOf(layer.id)}
           className={layer.blendMode && layer.blendMode !== 'normal' ? `blend-${layer.blendMode}` : ''}
-          attribution={layer.attribution}
           // Keep a few more tiles around so zooming feels smoother.
           keepBuffer={4}
         />

@@ -229,7 +229,7 @@
 
 .coords-readout {
   right: 12px;
-  bottom: 28px; /* above the attribution bar */
+  bottom: 56px; /* above the Credits button */
   font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
   text-align: right;
   pointer-events: none;
@@ -800,7 +800,7 @@
   position: absolute;
   z-index: 1000;
   right: 16px;
-  bottom: 84px;
+  bottom: 124px; /* above the coordinates readout */
   min-width: 64px;
   height: 56px;
   padding: 0 18px;
@@ -978,6 +978,91 @@
     font-size: 10px;
   }
   .fab {
-    bottom: 96px;
+    bottom: 124px;
   }
+}
+
+/* ---------- Credits (replaces Leaflet's attribution bar) ---------- */
+.credits {
+  position: absolute;
+  z-index: 1001; /* above the other HUD panels when open */
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.credits-toggle {
+  all: unset;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: rgba(15, 17, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e8e2da;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.credits-toggle:focus-visible {
+  outline: 2px solid #ffb27a;
+  outline-offset: 2px;
+}
+
+.credits.open .credits-toggle {
+  background: #c8693c;
+  color: #fff;
+}
+
+.credits-panel {
+  position: static;
+  width: 380px;
+  max-width: 100%;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.credits-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.credits-close {
+  min-width: 36px;
+  height: 36px;
+  line-height: 36px;
+}
+
+.credits-list {
+  margin: 0 0 6px;
+  padding-left: 16px;
+}
+
+.credits-list li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.credits-foot {
+  margin: 0;
+}
+
+.credits-panel a {
+  color: #ffb27a;
 }
