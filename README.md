@@ -20,6 +20,12 @@ water and shelter) that **works without a connection to Earth**.
 | **Geologic map with a categorical legend** | **Manual POIs: add with a button, tap, fill the form** |
 | ![Geology](docs/img/phase1b-geology-legend.jpg) | ![POI form](docs/img/phase1b-poi-form.jpg) |
 
+| Phase 2: tap the map for exact values (Gale, thermal section open) | Olympus Mons summit: 21 km, 91 Pa (live 200 m DEM) |
+|---|---|
+| ![Point panel at Gale](docs/img/phase2-gale-point-panel.jpg) | ![Olympus Mons summit](docs/img/phase2-olympus-summit.jpg) |
+| **ⓘ Info on a POI opens the same panel** | **Phone: bottom sheet (radiation & safety)** |
+| ![POI info](docs/img/phase2-poi-info.jpg) | ![Mobile sheet](docs/img/phase2-mobile-sheet.jpg) |
+
 ---
 
 ## Table of contents
@@ -95,6 +101,30 @@ detail-zones menu (auto-zoom; detailed data comes later).
   be edited and deleted. They are stored by the backend (`/api/pois`)
   behind a storage abstraction (JSON file today, database later).
 
+**Phase 2 — done ✅**: **tap anywhere for exact values.** A tap or click
+on the map (or **ⓘ Info** on a POI card) opens a location panel (side
+panel on desktop, bottom sheet on phones) with:
+
+- **Location**: coordinates, the crater it is inside / mountain it is
+  on, nearest named feature, region, nearest landing site and human
+  exploration zone, today's Mars season (Ls) and local solar time.
+- **Terrain**: elevation (200 m DEM where available, MOLA elsewhere),
+  slope with a trafficability class, roughness.
+- **Thermal & climate**: thermal inertia, surface pressure, **estimated
+  surface temperature** (daytime max, night min, now, and a curve over
+  the sol) for today's season or a chosen Ls, CO₂ frost point.
+- **Surface & composition**: albedo, dust cover index, TES minerals.
+- **Geology**: SIM 3292 unit and age.
+- **Radiation & safety**: cosmic-ray dose (scaled from Curiosity RAD),
+  yearly dose, days to the NASA career limit, water boiling point.
+
+Every value shows its unit, source dataset and resolution, and a tap
+reveals the method. Modelled values carry an **est.** badge; places a
+dataset does not cover say **No data**. The numbers come from real
+numeric rasters (PDS / USGS / ASU GeoTIFFs, ≈ 61 MB in git, built by a
+reproducible script), never from the coloured tiles, through `GET
+/api/point`. Works offline in Mars mode.
+
 See the [roadmap](#10-roadmap) for what comes next.
 
 ---
@@ -104,8 +134,8 @@ See the [roadmap](#10-roadmap) for what comes next.
 Monorepo with two top-level folders:
 
 - **`frontend/`** — React + Vite + Leaflet (react-leaflet). 2D only.
-- **`backend/`** — Python + FastAPI. Later: rasterio, numpy, scikit-image
-  for GeoTIFF queries and routing.
+- **`backend/`** — Python + FastAPI, rasterio + numpy for the numeric
+  GeoTIFF point queries. Later: scikit-image for routing.
 
 The **golden rule**: *the frontend only talks to our backend*. The backend
 is a black box that decides where the data comes from.
@@ -119,7 +149,10 @@ flowchart LR
     end
 
     subgraph Backend["Backend (FastAPI)"]
-        API["/api/* endpoints<br/>health · map · layers · tiles · zones<br/>features · pois"]
+        API["/api/* endpoints<br/>health · map · layers · tiles · zones<br/>features · pois · point"]
+        PSVC["PointService<br/>terrain · thermal model · radiation"]
+        RFACT{"RasterSource factory<br/>(rasters/factory.py)"}
+        RLOCAL[("data/rasters/*.tif<br/>MOLA · TES · DCI · SIM 3292")]
         CAT[("Catalog<br/>layers.yaml · map.yaml")]
         FEAT[("data/features/*.geojson<br/>IAU names · landing sites · EZs")]
         POIS[("PoiRepository<br/>JSON file / memory")]
@@ -132,6 +165,9 @@ flowchart LR
         API --> SVC --> FACT
         API --> FEAT
         API --> POIS
+        API --> PSVC --> RFACT
+        RFACT -- "always" --> RLOCAL
+        RFACT -- "remote (Earth) only" --> USGS[("USGS 200 m DEM<br/>HTTP range reads")]
         FACT -- "remote (Earth)" --> CACHE --> REMOTE
         FACT -- "local (Mars)" --> LOCAL
     end
@@ -152,6 +188,9 @@ Key pieces:
 | POI repository | `backend/app/repositories/pois.py` | `PoiRepository` interface with in-memory and JSON-file stores. A database store would be one new class. |
 | `TileProvider` interface | `backend/app/providers/base.py` | `get_tile(layer, z, x, y) -> Tile`. Any source implements just this. |
 | Provider factory | `backend/app/providers/factory.py` | **The one Earth/Mars switch**, driven by `DATA_SOURCE`. |
+| `RasterSource` interface | `backend/app/rasters/` + `app/catalog/rasters.yaml` | Numeric values at a point (rasterio windowed reads of local GeoTIFFs, or a remote GeoTIFF over HTTP range requests in Earth mode). Same Earth/Mars rule as the tiles. |
+| Point service | `backend/app/services/point.py` (+ `terrain.py`, `thermal.py`, `environment.py`, `mars_time.py`) | Builds the `/api/point` answer: raster values + models, each with unit, source, resolution and method. |
+| Location panel | `frontend/src/components/PointPanel.jsx`, `PointQuery.jsx` | Map tap → `/api/point` → generic renderer of sections/items. |
 | API client | `frontend/src/api/client.js` | The only frontend file that calls the backend. |
 | Map component | `frontend/src/components/MarsMap.jsx` | Renders whatever layers `/api/layers` announces, with the options it sends. |
 | Labels | `frontend/src/components/FeatureLabels.jsx` + `map/declutter.js` | Fetches labels for the visible area and hides the ones that would overlap. |
@@ -210,14 +249,18 @@ Arturo/
 │   ├── app/
 │   │   ├── main.py           FastAPI app, CORS, routers, provider lifecycle
 │   │   ├── core/config.py    settings from env vars / .env
-│   │   ├── api/              endpoints: health, map, layers, tiles, features, pois
-│   │   ├── catalog/          layers.yaml, map.yaml and their loaders
+│   │   ├── api/              endpoints: health, map, layers, tiles, features, pois, point
+│   │   ├── catalog/          layers.yaml, map.yaml, rasters.yaml and their loaders
 │   │   ├── models/           Pydantic models (internal vs public contract)
 │   │   ├── providers/        TileProvider + remote / local / cached + factory
+│   │   ├── rasters/          RasterSource + GeoTIFF / multi-file / layered + factory
 │   │   ├── repositories/     feature (labels) and POI storage abstractions
-│   │   └── services/         TileService, tile transforms, label ranking
-│   ├── scripts/              prefetch_tiles.py (offline packs), build_features.py (labels)
+│   │   └── services/         TileService, transforms, label ranking, point service,
+│   │                         terrain, thermal model, environment, Mars time
+│   ├── scripts/              prefetch_tiles.py (offline packs), build_features.py (labels),
+│   │                         build_rasters.py (numeric GeoTIFFs)
 │   ├── data/features/        label GeoJSON (IAU names, landing sites, EZs) — in git
+│   ├── data/rasters/         numeric GeoTIFFs for /api/point (~61 MB) — in git
 │   ├── data/pois/            user POIs (pois.json, not in git)
 │   ├── data/tiles/           offline packs (contents not in git)
 │   └── tests/                pytest suite (offline)
@@ -231,7 +274,8 @@ Arturo/
         ├── hooks/            useBackendData, useLayerState, useLabelState, usePois
         ├── map/              Mars CRS, URL hash, label declutter, POI icons and zoom rules
         └── components/       MarsMap, Sidebar (Layers / POIs / Zones), LayersPanel,
-                              LegendPanel, FeatureLabels, PoiLayer, PoiSheet, PoiPanel, …
+                              LegendPanel, FeatureLabels, PoiLayer, PoiSheet, PoiPanel,
+                              PointQuery, PointPanel, Sparkline, …
 ```
 
 ---
@@ -345,6 +389,9 @@ python -m pytest -q
 | `FEATURES_DIR` | `./data/features` | Folder with the label GeoJSON files served by `/api/features`. |
 | `POI_STORE` | `json` | POI storage: `json` (file, survives restarts) or `memory` (lost on restart). |
 | `POI_STORE_FILE` | `./data/pois/pois.json` | File used by the JSON POI store (created on first write). |
+| `RASTERS_DIR` | `./data/rasters` | Numeric GeoTIFFs for `/api/point`. |
+| `POINT_REMOTE_DEM` | `true` | Earth mode: read the USGS 200 m DEM live where no local crop exists (ignored in Mars mode). |
+| `POINT_REMOTE_TIMEOUT_S` | `8` | Timeout for those reads (then MOLA is used for 5 minutes). |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed origins when not using the Vite proxy. |
 
 ### Frontend (`frontend/.env.local`, see `frontend/.env.example`)
@@ -376,7 +423,7 @@ Interactive docs at http://localhost:8000/docs.
 | POST | `/api/pois` | Create a POI → `201` + GeoJSON Feature | 1b ✅ |
 | GET / PUT / DELETE | `/api/pois/{id}` | Read, update or delete one POI | 1b ✅ |
 | GET | `/api/pois/categories` | POI icon types with label, description and colour (the zoom rules are in `/api/map` → `poiVisibility`) | 1b ✅ |
-| GET | `/api/point?lat=&lon=` | Values at a point: elevation, slope, estimated temperature, radiation | 2 |
+| GET | `/api/point?lat=&lon=[&ls=][&tau=]` | Everything known about a location: sections of values, each with unit, source, resolution, method, `noData` and `estimate` flags | 2 ✅ |
 | POST | `/api/route` | Safe route between two points (GeoJSON + elevation profile + hazards) | 3 |
 
 ---
@@ -396,6 +443,8 @@ Interactive docs at http://localhost:8000/docs.
 | TES mineral maps (high-Ca pyroxene, plagioclase, sheet silicates/glass) | NASA / JPL / ASU (Bandfield 2002) | Mineralogy | [Mars Trek](https://trek.nasa.gov/mars/) |
 | Geologic map of Mars, SIM 3292 | Tanaka et al. 2014, USGS | Geology (categorical legend with 44 units) | [USGS](https://doi.org/10.3133/sim3292) |
 | Valley networks | Hynek et al. 2010 | Ancient valleys | [Mars Trek](https://trek.nasa.gov/mars/) |
+| **Numeric rasters for `/api/point`** (all in `backend/data/rasters/`) | MOLA MEGDR 16 px/° (Smith et al. 2003, PDS); HRSC+MOLA blended DEM v2 200 m (Fergason et al. 2018, USGS); TES thermal inertia 2007 (Putzig & Mellon 2007, PDS); TES Lambert albedo (Christensen et al. 2001, USGS); dust cover index (Ruff & Christensen 2002, ASU); TES mineral maps (Bandfield 2002, ASU); SIM 3292 (Tanaka et al. 2014, USGS) | Exact values at a point | [`backend/data/rasters/README.md`](backend/data/rasters/README.md) |
+| Radiation anchor values | MSL RAD: Hassler et al. 2014 (Science 343, 0.67 mSv/day at Gale); Zeitlin et al. 2013 (Science 340, 1.84 mSv/day in cruise) | Radiation estimate | [doi:10.1126/science.1244797](https://doi.org/10.1126/science.1244797) |
 | IAU Gazetteer of Planetary Nomenclature | IAU WGPSN / USGS Astrogeology | ~2,000 place-name labels | [Gazetteer](https://planetarynames.wr.usgs.gov/) |
 | Human exploration zones (2015 workshop) | NASA, EZMars layer of Mars Trek | 43 candidate human landing zones | [EZMars MapServer](https://trek.nasa.gov/mars/trekarcgis/rest/services/EZMars/MapServer) |
 | Robotic landing sites | Hand-curated from NASA/ESA/CNSA mission pages | 11 landing-site labels | `backend/data/features/README.md` |
@@ -403,8 +452,9 @@ Interactive docs at http://localhost:8000/docs.
 
 Full layer metadata (resolution, coverage, legend, references with DOIs)
 lives in `backend/app/catalog/layers.yaml` and is shown in each layer's
-legend. Planned for later phases: HiRISE images and DTMs (MRO), MSL/RAD
-radiation measurements (Curiosity), NASA Ames Mars climate model.
+legend. Planned for later phases: HiRISE images and DTMs (MRO), NASA
+Ames / Mars Climate Database fields (pressure, dust, temperature by
+season).
 
 Credits are one tap away behind the **ⓘ Credits** button in the map's
 bottom-right corner. The panel lists only what is on screen: the tile
@@ -420,7 +470,7 @@ per layer in `layers.yaml`), the label groups that are on (credit text in
 |---|---|---|
 | **1 ✅** | Global map | Whole-Mars 2D map with pan/zoom/LOD, base imagery (Viking + CTX), backend proxy with Earth/Mars providers, cache/offline packs, zones menu stub. |
 | **1b ✅** | Layers, labels, POIs | 16 toggleable layers with legends; IAU / landing-site / exploration-zone labels with decluttering (`/api/features`); manual POIs with CRUD (`/api/pois`); layer panel with opacity and order. |
-| **2** | Point query | Click anywhere → elevation, slope, estimated temperature, radiation. Backend reads GeoTIFFs with rasterio (global MOLA DEM ~463 m/px; per-zone HiRISE DTMs) → `GET /api/point`. |
+| **2 ✅** | Point query | Tap anywhere (or POI ⓘ Info) → location, terrain, thermal & climate, composition, geology, radiation & safety. Backend reads numeric GeoTIFFs with rasterio behind a `RasterSource` abstraction (200 m DEM crops / live USGS DEM / MOLA, TES, DCI, SIM 3292) plus small physical models → `GET /api/point`. |
 | **3** | Safe routes | Slope map from the DEM, hazard mask above a threshold angle, A* (scikit-image) between two points → `POST /api/route` returning GeoJSON with elevation profile, distance and hazard warnings. |
 | **Extras** | Survival guide | Detail-zone packs (HiRISE) downloadable from the side menu; time/season-aware temperature and radiation warnings; offline pack manager; Service Worker for a fully offline frontend; printable traverse plan. |
 
@@ -512,8 +562,7 @@ Example: a MOLA hillshade from Mars Trek.
   (it is tiny and local in Mars mode; a PWA is on the roadmap).
 - **Most legends are qualitative**: NASA Trek does not document the exact
   colour ramp of most products. The legends show the direction (low →
-  high) and the source. Exact values (elevation, slope, temperature) will
-  come from the GeoTIFFs in phase 2.
+  high) and the source. Exact values are one tap away (location panel).
 - **Coarse layers**: TES and roughness products are 3–16 km/pixel. They
   are blurry when zoomed in; their tiles only exist at levels 0–2 and are
   upscaled beyond that.
@@ -521,6 +570,20 @@ Example: a MOLA hillshade from Mars Trek.
 - **Labels**: only IAU names with an official centre point are included
   (2,055). Albedo features and small craters only appear when zoomed in.
   Labels are placed at a point, not along valleys.
+- **Temperature is a model, not a measurement** (±10–20 K): flat
+  ground, clear weather, fixed dust opacity, no seasonal memory (so
+  seasonal CO₂ frost and polar ice are not represented; the panel warns
+  above 55° latitude).
+- **Radiation is a two-anchor scaling** of Curiosity RAD with the
+  atmospheric column (±50 %); no solar storms, solar cycle or shielding.
+- **Pressure** is an annual mean from the elevation (±10–15 % seasonal).
+- **Resolution of point values**: elevation 200 m only in the Gale and
+  Jezero crops (and live in Earth mode); elsewhere offline it is MOLA at
+  ~3.7 km, so slopes are kilometre-scale. TES products are 3–15 km.
+  Minerals below ~10–15 % are not significant. THEMIS has no absolute
+  values (its mosaics are stretched images).
+- **"Inside" / "region"** use the IAU centre and diameter as a circle;
+  real outlines are not circles.
 - **POIs are not synced or authenticated**: one shared JSON file per
   backend, with no users and no conflict handling between devices.
 - **Mars mode only serves cached layers**: a layer you never browsed (or
