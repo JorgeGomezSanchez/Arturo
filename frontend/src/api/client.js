@@ -115,3 +115,34 @@ export const deletePoi = (id) => request('DELETE', `/api/pois/${encodeURICompone
  */
 export const getPoint = ({ lat, lon, ls }, signal) =>
   getJson('/api/point', { query: { lat: lat.toFixed(5), lon: lon.toFixed(5), ls }, signal })
+
+/* ---------------------------------------------------------------- routes */
+
+/** Travel modes and hazard thresholds (backend routes.yaml). */
+export const getRoutesConfig = () => getJson('/api/routes/config')
+
+/** All saved routes as a GeoJSON FeatureCollection of LineStrings. */
+export const getRoutes = () => getJson('/api/routes')
+
+/**
+ * Create a route. data = { name, notes, mode, start, end, waypoints,
+ * createdZoom } where start/end = { kind: 'poi'|'feature'|'point', refId,
+ * name, lat, lon } and waypoints = [[lon, lat], ...]. The backend
+ * analyses it and returns the Feature with properties.stats.
+ */
+export const createRoute = (data) => request('POST', '/api/routes', { body: data })
+
+/** Replace a route (same shape as createRoute); re-analysed by the backend. */
+export const updateRoute = (id, data) =>
+  request('PUT', `/api/routes/${encodeURIComponent(id)}`, { body: data })
+
+/** Delete a route. */
+export const deleteRoute = (id) => request('DELETE', `/api/routes/${encodeURIComponent(id)}`)
+
+/**
+ * Analyse a line without saving it: coordinates = [[lon, lat], ...]
+ * (A, waypoints..., B). Returns distance, duration, dose, profile,
+ * hazards and severity-coloured segments.
+ */
+export const analyzeRoute = ({ coordinates, mode, ls }, signal) =>
+  request('POST', '/api/routes/analyze', { body: { coordinates, mode, ls }, signal })
