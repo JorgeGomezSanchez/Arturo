@@ -21,3 +21,8 @@ data/tiles/*
 
 # User POIs (personal data, created at runtime)
 data/pois/
+
+# Raw downloads of scripts/build_rasters.py (rebuilt on demand)
+data/rasters/_downloads/
+# Optional big rasters (built locally, never committed)
+data/rasters/tes_ti_day_2007_20ppd.tif

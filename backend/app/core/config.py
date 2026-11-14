@@ -76,12 +76,29 @@ class Settings(BaseSettings):
     poi_store: Literal["json", "memory"] = "json"
     poi_store_file: Path = BACKEND_DIR / "data" / "pois" / "pois.json"
 
+    # ------------------------------------------------------------------
+    # POINT QUERIES (GET /api/point): numeric rasters (GeoTIFF).
+    #   RASTERS_DIR       folder with the GeoTIFFs built by
+    #                     scripts/build_rasters.py (coarse global grids
+    #                     are committed, so it works offline).
+    #   RASTERS_FILE      catalog: which dataset lives in which file.
+    #   POINT_REMOTE_DEM  in remote mode (Earth), also read the 200 m
+    #                     HRSC+MOLA DEM from USGS with HTTP range
+    #                     requests where no local 200 m crop exists.
+    #                     Ignored in local mode (Mars): never online.
+    # ------------------------------------------------------------------
+    rasters_dir: Path = BACKEND_DIR / "data" / "rasters"
+    rasters_file: Path = BACKEND_DIR / "app" / "catalog" / "rasters.yaml"
+    point_remote_dem: bool = True
+    point_remote_timeout_s: float = 8.0
+
     # Allowed CORS origins (comma separated). In development the frontend
     # uses the Vite proxy, so this is usually not needed.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @field_validator(
-        "layers_file", "map_file", "local_tiles_dir", "tile_cache_dir", "features_dir", "poi_store_file"
+        "layers_file", "map_file", "local_tiles_dir", "tile_cache_dir", "features_dir", "poi_store_file",
+        "rasters_dir", "rasters_file",
     )
     @classmethod
     def _resolve_relative_to_backend(cls, value: Path) -> Path:

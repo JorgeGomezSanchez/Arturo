@@ -10,3 +10,9 @@ pydantic-settings>=2.2       # typed configuration from environment variables / 
 pyyaml>=6.0                  # reads the layer catalog (app/catalog/*.yaml)
 httpx>=0.27                  # async HTTP client used by the remote tile provider
 pillow>=10.0                 # tile post-processing (e.g. transparent no-data gaps)
+
+# --- Phase 2: point queries (numeric rasters) ---
+# Wheels exist for CPython 3.10-3.14 on Linux, macOS and Windows (no GDAL
+# install needed: the wheel bundles it).
+rasterio>=1.4.3              # windowed GeoTIFF reads, local and over HTTP (/vsicurl/)
+numpy>=1.26                  # raster math (slope, roughness, thermal model)
