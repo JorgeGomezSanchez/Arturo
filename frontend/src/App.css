@@ -433,7 +433,9 @@
   right: 12px;
   width: 300px;
   max-width: calc(100% - 24px);
-  max-height: calc(100% - 200px);
+  /* ends above the bottom-right stack (Credits, readout, ＋ POI) */
+  box-sizing: border-box;
+  max-height: calc(100% - 96px - 196px);
   display: flex;
   flex-direction: column;
   padding: 0.35rem;
@@ -571,9 +573,9 @@
   }
   .legend-panel {
     top: auto;
-    bottom: 80px;
+    bottom: 196px; /* above Credits, readout and ＋ POI */
     width: 260px;
-    max-height: 40%;
+    max-height: min(40%, calc(100% - 196px - 72px));
   }
 }
 
