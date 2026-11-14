@@ -57,6 +57,12 @@ def test_ctx_nodata_becomes_transparent(client):
     assert img.getpixel((400, 400))[-1] == 255  # data -> opaque
 
 
+def test_truncated_ctx_tile_is_404_not_500(client, tiles_dir):
+    good = (tiles_dir / "ctx_global_5m" / "3" / "4" / "2.png").read_bytes()
+    (tiles_dir / "ctx_global_5m" / "3" / "4" / "3.png").write_bytes(good[: len(good) // 2])
+    assert client.get("/api/tiles/ctx_global_5m/3/4/3").status_code == 404
+
+
 def test_map_and_zones(client):
     m = client.get("/api/map").json()
     assert m["crs"] == "EPSG4326" and m["body"] == "Mars"

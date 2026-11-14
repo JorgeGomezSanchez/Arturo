@@ -7,11 +7,14 @@ Mars mode, and the cache/local packs keep the original, untouched tiles.
 from __future__ import annotations
 
 import io
+import logging
 
 from PIL import Image
 
 from app.models.layer import LayerConfig
-from app.providers.base import Tile
+from app.providers.base import Tile, TileNotFoundError
+
+log = logging.getLogger(__name__)
 
 
 def apply_transforms(layer: LayerConfig, tile: Tile) -> Tile:
@@ -27,8 +30,15 @@ def nodata_to_transparent(tile: Tile) -> Tile:
     them transparent lets the layer underneath (Viking colour) fill the
     gaps instead of showing black holes.
     """
-    img = Image.open(io.BytesIO(tile.content))
-    grey = img.convert("L")
+    try:
+        img = Image.open(io.BytesIO(tile.content))
+        grey = img.convert("L")
+    except OSError as exc:
+        # Some upstream tiles at the edge of the CTX mosaic arrive
+        # truncated. Treat them as "no data" (404) so the layer below
+        # shows through, instead of failing the request with a 500.
+        log.warning("unreadable tile from %s: %s", tile.origin, exc)
+        raise TileNotFoundError(f"unreadable image: {exc}") from exc
     # Alpha channel: 0 where the pixel is pure black, 255 elsewhere.
     alpha = grey.point(lambda v: 0 if v == 0 else 255)
     if alpha.getextrema() == (255, 255):
