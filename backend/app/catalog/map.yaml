@@ -71,3 +71,44 @@ zones:
     center: { lat: 44.0, lon: 22.0 }
     bounds: { south: 40.0, west: 16.0, north: 48.0, east: 28.0 }
     tags: [human-landing, water-ice, glaciers]
+
+# ---------------------------------------------------------------------
+#  User POIs (GET /api/pois/categories and GET /api/map -> poiVisibility)
+#  The frontend draws one icon per category id (resource, shelter,
+#  hazard, vehicle, unknown); label, description and colour come from
+#  here.
+# ---------------------------------------------------------------------
+poi_categories:
+  - id: resource
+    label: "Resource"
+    description: "Water ice, useful minerals, supply cache…"
+    color: "#22b8cf"
+  - id: shelter
+    label: "Shelter"
+    description: "Habitat, cave, overhang or any safe place to wait out a storm"
+    color: "#40c057"
+  - id: hazard
+    label: "Hazard"
+    description: "Steep slope, soft ground, boulder field, crevasse…"
+    color: "#fa5252"
+  - id: vehicle
+    label: "Vehicle"
+    description: "Rover, lander, ascent vehicle, parked equipment"
+    color: "#fab005"
+  - id: unknown
+    label: "Unknown"
+    description: "Something worth checking later"
+    color: "#be4bdb"
+
+# Label/marker visibility of user POIs depending on the zoom they were
+# created at (c = createdZoom, z = current zoom):
+#   z >= c - label_zoom_margin               -> icon + name label
+#   z >= c - marker_zoom_margin (and below)  -> small coloured dot
+#   otherwise                                -> hidden (still listed in
+#                                               the POI panel)
+#   c <= world_zoom                          -> "world-view" POI: always
+#                                               icon + label
+poi_visibility:
+  label_zoom_margin: 2
+  marker_zoom_margin: 5
+  world_zoom: 3

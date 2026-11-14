@@ -14,12 +14,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import features, health, layers, map, tiles
+from app.api import features, health, layers, map, pois, tiles
 from app.catalog.map_config import get_map_config
 from app.catalog.registry import get_registry
 from app.core.config import get_settings
 from app.providers.factory import build_tile_provider
 from app.repositories.features import GeoJsonDirFeatureRepository
+from app.repositories.pois import build_poi_repository
 from app.services.tiles import TileService
 
 settings = get_settings()
@@ -38,6 +39,8 @@ async def lifespan(app: FastAPI):
     app.state.feature_repository = GeoJsonDirFeatureRepository.from_dir(
         settings.features_dir, get_map_config().radius_m
     )
+    # User POIs: storage chosen by POI_STORE (json file by default).
+    app.state.poi_repository = build_poi_repository(settings)
     yield
     await provider.close()
 
@@ -66,6 +69,7 @@ app.include_router(layers.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
 app.include_router(map.router, prefix="/api")
 app.include_router(features.router, prefix="/api")
+app.include_router(pois.router, prefix="/api")
 
 
 @app.get("/", tags=["system"], summary="API index (what lives where)")

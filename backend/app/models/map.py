@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.models.poi import PoiVisibility
+
 
 class _Camel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
@@ -33,6 +35,8 @@ class MapConfig(_Camel):
     min_zoom: int
     max_zoom: int
     bounds: Bounds
+    # Zoom-based visibility rules for user POIs (see map.yaml).
+    poi_visibility: PoiVisibility = PoiVisibility()
 
 
 class Zone(_Camel):

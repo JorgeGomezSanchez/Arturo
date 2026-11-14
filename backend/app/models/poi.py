@@ -50,7 +50,9 @@ class PoiInput(_Camel):
     @classmethod
     def _wrap_lon(cls, v: float) -> float:
         # Leaflet may report unwrapped longitudes (e.g. 200 = -160).
-        return ((v + 180.0) % 360.0) - 180.0
+        if -180.0 <= v <= 180.0:
+            return v
+        return round(((v + 180.0) % 360.0) - 180.0, 7)
 
 
 class Poi(PoiInput):

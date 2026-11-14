@@ -8,6 +8,7 @@ import yaml
 
 from app.core.config import get_settings
 from app.models.map import MapConfig, Zone
+from app.models.poi import PoiCategory, PoiVisibility
 
 
 @lru_cache
@@ -17,8 +18,13 @@ def _raw() -> dict:
 
 
 def get_map_config() -> MapConfig:
-    return MapConfig(**_raw()["map"])
+    raw = _raw()
+    return MapConfig(**raw["map"], poi_visibility=PoiVisibility(**raw.get("poi_visibility", {})))
 
 
 def get_zones() -> list[Zone]:
     return [Zone(**z) for z in _raw().get("zones", [])]
+
+
+def get_poi_categories() -> list[PoiCategory]:
+    return [PoiCategory(**c) for c in _raw().get("poi_categories", [])]

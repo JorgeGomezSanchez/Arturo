@@ -19,4 +19,5 @@ def health(request: Request) -> dict:
         # "remote" (Earth) or "local" (Mars)
         "dataSource": settings.data_source,
         "tileProvider": request.app.state.tile_provider.describe(),
+        "poiStore": request.app.state.poi_repository.describe(),
     }

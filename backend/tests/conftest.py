@@ -38,6 +38,9 @@ def tiles_dir(tmp_path: Path) -> Path:
 def client(tiles_dir: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATA_SOURCE", "local")
     monkeypatch.setenv("LOCAL_TILES_DIR", str(tiles_dir))
+    # POIs go to a temporary JSON file (never the real data/pois/).
+    monkeypatch.setenv("POI_STORE", "json")
+    monkeypatch.setenv("POI_STORE_FILE", str(tiles_dir.parent / "pois.json"))
 
     from app.catalog import map_config, registry
     from app.core import config
