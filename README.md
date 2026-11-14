@@ -26,6 +26,12 @@ water and shelter) that **works without a connection to Earth**.
 | **ⓘ Info on a POI opens the same panel** | **Phone: bottom sheet (radiation & safety)** |
 | ![POI info](docs/img/phase2-poi-info.jpg) | ![Mobile sheet](docs/img/phase2-mobile-sheet.jpg) |
 
+| Phase 3: route from the Curiosity landing site to the Mount Sharp foothills, hazards on the line and in the list | Drag the line to deviate: hazards recomputed (6 warnings → 4) |
+|---|---|
+| ![Route created](docs/img/phase3-route-created.jpg) | ![Rerouted](docs/img/phase3-rerouted.jpg) |
+| **Tap a hazard: the map flies to it and highlights it** | **Phone: bottom sheet, touch-dragged waypoint** |
+| ![Hazard selected](docs/img/phase3-hazard-selected.jpg) | ![Mobile route sheet](docs/img/phase3-mobile-sheet.jpg) |
+
 ---
 
 ## Table of contents
@@ -124,6 +130,43 @@ dataset does not cover say **No data**. The numbers come from real
 numeric rasters (PDS / USGS / ASU GeoTIFFs, ≈ 61 MB in git, built by a
 reproducible script), never from the coloured tiles, through `GET
 /api/point`. Works offline in Mars mode.
+
+**Phase 3 — done ✅**: **hand-drawn routes with hazards.** Tap **↝ Route**
+(or *New route* in the Routes tab), tap the start **A** and the end **B**.
+A and B can be your POIs, named places (labels) or any point: a tap within
+28 px of a POI or label snaps to it. A straight line (a great circle on
+the Mars sphere) is drawn and analysed by the backend:
+
+- **Statistics**: distance, walking/driving time, elevation gain and
+  loss, cosmic-ray dose for the trip, max slope, night minimum.
+- **Elevation profile** with the hazard stretches shaded.
+- **Hazards**, each with severity (info / warning / danger), where it
+  starts and ends (km from A), its worst value and the limit it
+  crossed: steep or impassable slope, steep climbs/descents, rough
+  ground, soft ground, dust, extreme night cold, thin air, higher
+  radiation, crater rim crossings, no data / coarse data, rover
+  walk-back distance, too long for one excursion, trip dose.
+- **The line is coloured** by the worst severity of each stretch
+  (green / amber / red, grey dashed = no data) with ◆ markers on
+  warnings and dangers. Tapping a hazard (list, marker or profile)
+  flies the map to it and highlights it.
+- **Google-Maps-like editing, made for touch** (no right-click): grab
+  the line anywhere (or a **+** midpoint handle) and drag to add a
+  waypoint, drag A/B/waypoints to move them, tap a waypoint →
+  *Remove waypoint*. After each drop the route is re-analysed
+  (debounced, with a loading indicator).
+- **Travel mode**: on foot (EVA suit, 2 km/h, Tobler's hiking function)
+  or pressurised rover (8 km/h). Modes and **every threshold** live in
+  `backend/app/catalog/routes.yaml` with their sources.
+- **Saved like POIs** (`/api/routes`, JSON file behind a
+  `RouteRepository`), listed in the Routes tab to reopen, edit or
+  delete.
+
+Routes are sampled at the resolution of the best elevation data on the
+way (200 m in the Gale/Jezero crops and live in Earth mode for short
+routes, MOLA ~3.7 km elsewhere); the panel always says which data and
+resolution were used. Routing is **manual** for now: you move the line,
+the app tells you what is dangerous. Automatic suggestions come later.
 
 See the [roadmap](#10-roadmap) for what comes next.
 
@@ -249,19 +292,21 @@ Arturo/
 │   ├── app/
 │   │   ├── main.py           FastAPI app, CORS, routers, provider lifecycle
 │   │   ├── core/config.py    settings from env vars / .env
-│   │   ├── api/              endpoints: health, map, layers, tiles, features, pois, point
-│   │   ├── catalog/          layers.yaml, map.yaml, rasters.yaml and their loaders
+│   │   ├── api/              endpoints: health, map, layers, tiles, features, pois, point, routes
+│   │   ├── catalog/          layers.yaml, map.yaml, rasters.yaml, routes.yaml and their loaders
 │   │   ├── models/           Pydantic models (internal vs public contract)
 │   │   ├── providers/        TileProvider + remote / local / cached + factory
 │   │   ├── rasters/          RasterSource + GeoTIFF / multi-file / layered + factory
-│   │   ├── repositories/     feature (labels) and POI storage abstractions
+│   │   ├── repositories/     feature (labels), POI and route storage abstractions
 │   │   └── services/         TileService, transforms, label ranking, point service,
-│   │                         terrain, thermal model, environment, Mars time
+│   │                         terrain, thermal model, environment, Mars time,
+│   │                         geodesy (great circles), route_analysis (hazards)
 │   ├── scripts/              prefetch_tiles.py (offline packs), build_features.py (labels),
 │   │                         build_rasters.py (numeric GeoTIFFs)
 │   ├── data/features/        label GeoJSON (IAU names, landing sites, EZs) — in git
 │   ├── data/rasters/         numeric GeoTIFFs for /api/point (~61 MB) — in git
 │   ├── data/pois/            user POIs (pois.json, not in git)
+│   ├── data/routes/          user routes (routes.json, not in git)
 │   ├── data/tiles/           offline packs (contents not in git)
 │   └── tests/                pytest suite (offline)
 └── frontend/                 Web app (React + Vite + Leaflet)
@@ -271,11 +316,14 @@ Arturo/
     ├── .env.example
     └── src/
         ├── api/client.js     backend client (only place with the API URL)
-        ├── hooks/            useBackendData, useLayerState, useLabelState, usePois
-        ├── map/              Mars CRS, URL hash, label declutter, POI icons and zoom rules
-        └── components/       MarsMap, Sidebar (Layers / POIs / Zones), LayersPanel,
+        ├── hooks/            useBackendData, useLayerState, useLabelState, usePois,
+        │                     useRoutes, useRouteAnalysis
+        ├── map/              Mars CRS, URL hash, label declutter, POI icons and zoom rules,
+        │                     route helpers (snapping, colours)
+        └── components/       MarsMap, Sidebar (Layers / POIs / Routes / Zones), LayersPanel,
                               LegendPanel, FeatureLabels, PoiLayer, PoiSheet, PoiPanel,
-                              PointQuery, PointPanel, Sparkline, …
+                              PointQuery, PointPanel, Sparkline, RouteLayer, RoutePanel,
+                              RouteProfile, RoutesPanel, …
 ```
 
 ---
@@ -361,6 +409,8 @@ Tips:
   interest. **Zones** tab: detail zones.
 - Add a POI: tap **＋ POI** (bottom right), tap the map, fill the form.
   Press `Esc` or *Cancel* to stop placing.
+- Draw a route: tap **↝ Route**, tap A, tap B. Drag the line to deviate
+  it, then *Save route*. Saved routes are in the **Routes** tab.
 
 ### 3. Tests (optional)
 
@@ -389,7 +439,10 @@ python -m pytest -q
 | `FEATURES_DIR` | `./data/features` | Folder with the label GeoJSON files served by `/api/features`. |
 | `POI_STORE` | `json` | POI storage: `json` (file, survives restarts) or `memory` (lost on restart). |
 | `POI_STORE_FILE` | `./data/pois/pois.json` | File used by the JSON POI store (created on first write). |
-| `RASTERS_DIR` | `./data/rasters` | Numeric GeoTIFFs for `/api/point`. |
+| `RASTERS_DIR` | `./data/rasters` | Numeric GeoTIFFs for `/api/point` and route analysis. |
+| `ROUTE_STORE` | `json` | Route storage: `json` (file) or `memory`. |
+| `ROUTE_STORE_FILE` | `./data/routes/routes.json` | File used by the JSON route store. |
+| `ROUTES_FILE` | `app/catalog/routes.yaml` | Travel modes and hazard thresholds. |
 | `POINT_REMOTE_DEM` | `true` | Earth mode: read the USGS 200 m DEM live where no local crop exists (ignored in Mars mode). |
 | `POINT_REMOTE_TIMEOUT_S` | `8` | Timeout for those reads (then MOLA is used for 5 minutes). |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed origins when not using the Vite proxy. |
@@ -424,7 +477,12 @@ Interactive docs at http://localhost:8000/docs.
 | GET / PUT / DELETE | `/api/pois/{id}` | Read, update or delete one POI | 1b ✅ |
 | GET | `/api/pois/categories` | POI icon types with label, description and colour (the zoom rules are in `/api/map` → `poiVisibility`) | 1b ✅ |
 | GET | `/api/point?lat=&lon=[&ls=][&tau=]` | Everything known about a location: sections of values, each with unit, source, resolution, method, `noData` and `estimate` flags | 2 ✅ |
-| POST | `/api/route` | Safe route between two points (GeoJSON + elevation profile + hazards) | 3 |
+| GET | `/api/routes` | Saved routes (GeoJSON LineStrings with summary `stats`) | 3 ✅ |
+| POST | `/api/routes` | Create a route (A, B, waypoints, mode…) → `201`, analysed on save | 3 ✅ |
+| GET / PUT / DELETE | `/api/routes/{id}` | Read, update (re-analysed) or delete one route | 3 ✅ |
+| GET | `/api/routes/{id}/analysis[?ls=]` | Full analysis of a saved route | 3 ✅ |
+| POST | `/api/routes/analyze` | Analyse a line without saving: profile, hazards, coloured segments, distance, time, dose | 3 ✅ |
+| GET | `/api/routes/config` | Travel modes and hazard thresholds (`routes.yaml`) | 3 ✅ |
 
 ---
 
@@ -445,6 +503,7 @@ Interactive docs at http://localhost:8000/docs.
 | Valley networks | Hynek et al. 2010 | Ancient valleys | [Mars Trek](https://trek.nasa.gov/mars/) |
 | **Numeric rasters for `/api/point`** (all in `backend/data/rasters/`) | MOLA MEGDR 16 px/° (Smith et al. 2003, PDS); HRSC+MOLA blended DEM v2 200 m (Fergason et al. 2018, USGS); TES thermal inertia 2007 (Putzig & Mellon 2007, PDS); TES Lambert albedo (Christensen et al. 2001, USGS); dust cover index (Ruff & Christensen 2002, ASU); TES mineral maps (Bandfield 2002, ASU); SIM 3292 (Tanaka et al. 2014, USGS) | Exact values at a point | [`backend/data/rasters/README.md`](backend/data/rasters/README.md) |
 | Radiation anchor values | MSL RAD: Hassler et al. 2014 (Science 343, 0.67 mSv/day at Gale); Zeitlin et al. 2013 (Science 340, 1.84 mSv/day in cruise) | Radiation estimate | [doi:10.1126/science.1244797](https://doi.org/10.1126/science.1244797) |
+| Route thresholds and speeds | Apollo EVA and LRV experience (walking speeds, 10–15° slopes found tiring, 25° LRV design slope, ~10 km walk-back rule, 7–8 h EVAs); Curiosity/Perseverance traverse planning (~15–20° risky); Tobler 1993 hiking function; angle of repose of loose granular material (~30–35°); Spirit's soft-soil entrapment (2009); dust cover index (Ruff & Christensen 2002); km-scale Hurst exponent of Mars topography (Orosei et al. 2003) | Route hazards (`routes.yaml`, each value commented) | [`backend/README.md` §12](backend/README.md#12-routes-apiroutes) |
 | IAU Gazetteer of Planetary Nomenclature | IAU WGPSN / USGS Astrogeology | ~2,000 place-name labels | [Gazetteer](https://planetarynames.wr.usgs.gov/) |
 | Human exploration zones (2015 workshop) | NASA, EZMars layer of Mars Trek | 43 candidate human landing zones | [EZMars MapServer](https://trek.nasa.gov/mars/trekarcgis/rest/services/EZMars/MapServer) |
 | Robotic landing sites | Hand-curated from NASA/ESA/CNSA mission pages | 11 landing-site labels | `backend/data/features/README.md` |
@@ -471,7 +530,8 @@ per layer in `layers.yaml`), the label groups that are on (credit text in
 | **1 ✅** | Global map | Whole-Mars 2D map with pan/zoom/LOD, base imagery (Viking + CTX), backend proxy with Earth/Mars providers, cache/offline packs, zones menu stub. |
 | **1b ✅** | Layers, labels, POIs | 16 toggleable layers with legends; IAU / landing-site / exploration-zone labels with decluttering (`/api/features`); manual POIs with CRUD (`/api/pois`); layer panel with opacity and order. |
 | **2 ✅** | Point query | Tap anywhere (or POI ⓘ Info) → location, terrain, thermal & climate, composition, geology, radiation & safety. Backend reads numeric GeoTIFFs with rasterio behind a `RasterSource` abstraction (200 m DEM crops / live USGS DEM / MOLA, TES, DCI, SIM 3292) plus small physical models → `GET /api/point`. |
-| **3** | Safe routes | Slope map from the DEM, hazard mask above a threshold angle, A* (scikit-image) between two points → `POST /api/route` returning GeoJSON with elevation profile, distance and hazard warnings. |
+| **3 ✅** | Manual routes with hazards | A → B between POIs, labels or any point; great-circle line analysed against the DEM and the Phase 2 rasters/models (slope, grade, roughness, soft ground, dust, cold, pressure, radiation, crater rims, no data); severity-coloured line, profile and hazard list; Google-Maps-like touch editing; CRUD (`/api/routes`). |
+| **4** | Route suggestions | Cost surface from the same hazards, A* / least-cost path between A and B (and "avoid this hazard" from the list), time windows by season and local time. |
 | **Extras** | Survival guide | Detail-zone packs (HiRISE) downloadable from the side menu; time/season-aware temperature and radiation warnings; offline pack manager; Service Worker for a fully offline frontend; printable traverse plan. |
 
 ---
@@ -540,6 +600,9 @@ Example: a MOLA hillshade from Mars Trek.
 | **Labels pre-built as GeoJSON, served by the backend** | Query the USGS Gazetteer live; label tiles | Works offline on Mars, files are small (~0.7 MB), and the backend can rank and filter by bbox/zoom. The frontend still decides the final on-screen layout because only it knows text sizes. |
 | **Declutter in the browser (greedy, by priority)** | Server-side placement; Leaflet plugins | Collision depends on the font, the screen and the current view. A greedy pass in priority order with a grid index handles ~600 candidates in a few ms. |
 | **POI visibility from `createdZoom`** | A manual "global/local" flag | It needs no extra choice from the user: what you mark while looking at the whole planet stays visible at that scale; what you mark at a single rock only appears near that zoom. |
+| **Manual routes first** | Automatic A* right away | The astronaut keeps control and sees *why* a line is dangerous; the analyser written for it is exactly the cost function a later pathfinder needs. |
+| **Thresholds only in `routes.yaml`** | Constants in code or in the frontend | Mission planners can tune them (and see their sources) without touching code; the frontend reads them from `/api/routes/config` and only knows colours. |
+| **Sampling at the DEM's resolution** | Fixed step | Sampling a 3.7 km MOLA pixel every 50 m adds no information; sampling 200 m data every 2 km misses slopes. The spacing follows the best data on the way (≥ 50 m, ≤ 2,500 samples). |
 | **POI storage behind `PoiRepository`** | Writing SQL/JSON directly in the endpoints | JSON file today; a database or a store synced between habitats tomorrow, with no API or frontend change. |
 | **Honest legends** | Inventing value ranges | Several Trek products don't publish their colour ramp. A wrong number on a survival map is worse than "qualitative: high/low". |
 
@@ -584,6 +647,20 @@ Example: a MOLA hillshade from Mars Trek.
   values (its mosaics are stretched images).
 - **"Inside" / "region"** use the IAU centre and diameter as a circle;
   real outlines are not circles.
+- **Routes are analysed, not planned**: the app does not search for a
+  safer path yet; you deviate the line yourself.
+- **Route resolution**: 200 m elevation only inside the Gale/Jezero
+  crops, or live in Earth mode for routes small enough (≤ ~80 DEM rows,
+  roughly ≤ 30 km north–south; bigger blocks would take tens of seconds
+  over HTTP, so MOLA ~3.7 km is used). With MOLA a 3.7 km pixel hides
+  rims, scarps and boulders: slope is a kilometre-scale average and the
+  panel adds a *coarse data* note. No HiRISE DTMs yet.
+- **Simplified hazard geometry**: crater rims are circles from the IAU
+  centre and diameter; temperature, pressure and radiation are the
+  Phase 2 models (estimates); roughness is DEM-scale, not rock
+  abundance; no lighting, communications or line-of-sight checks.
+- **No antimeridian routes** (a route may not cross 180° E/W) and at
+  most 200 waypoints.
 - **POIs are not synced or authenticated**: one shared JSON file per
   backend, with no users and no conflict handling between devices.
 - **Mars mode only serves cached layers**: a layer you never browsed (or

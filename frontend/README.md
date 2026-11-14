@@ -69,6 +69,10 @@ After that it calls, as needed:
 | `GET /api/features?bbox=&zoom=&limit=600` | When the view changes (debounced 120 ms; results cached per view). |
 | `GET /api/pois` | Once at startup and after each change. |
 | `POST` / `PUT` / `DELETE /api/pois…` | When you create, edit or delete a POI. |
+| `GET /api/routes`, `GET /api/routes/config` | Once at startup (saved routes, travel modes). |
+| `POST /api/routes/analyze` | After every route edit (debounced 300 ms, previous request aborted). |
+| `POST` / `PUT` / `DELETE /api/routes…` | When you save or delete a route. |
+| `GET /api/features?bbox=…&limit=30` | When a route end is tapped, to snap it to a nearby label. |
 
 Then, for each layer, it creates a Leaflet `TileLayer` with the
 options **exactly as the backend sends them** (`tileUrl`, `tileSize`,
@@ -222,10 +226,59 @@ POI card opens the same panel at the POI, titled with its name, with a
 The legend panel ends with a hint that colours are approximate and exact
 values are one tap away.
 
+### Routes (Phase 3)
+
+Manual routes from A to B, analysed by the backend. All thresholds live
+in the backend (`routes.yaml`); the frontend only maps severities to
+colours (`map/routes.js`).
+
+- **Create**: **↝ Route** (floating button) or *New route* in the
+  Routes tab → banner "Tap the start (A)" → tap → "Now tap the end (B)"
+  → tap. `Esc` / *Cancel* stops. A tap within 28 px of a POI snaps to it
+  (`kind: poi`), else to the nearest label within 28 px (asked to
+  `/api/features` with a tiny bbox and the label families that are on;
+  `kind: feature`), else it is a free point. While a route is open,
+  labels and POI markers are click-through (CSS `route-mode`) and the
+  location panel is off, so taps and drags reach the route.
+- **State** (`App.jsx`): `routeUi` = `pickA` → `pickB {start}` → `edit
+  {id, draft, dirty}`; `draft` has the `RouteInput` shape (name, notes,
+  mode, start, end, waypoints). `useRouteAnalysis(coordinates, mode)`
+  re-analyses on every change; the last answer stays (dimmed) while the
+  next one loads, with an *Analysing…* indicator.
+- **Map** (`components/RouteLayer.jsx`): the analysed segments in
+  green / amber / red (grey dashed = no data) over a dark casing; a plain
+  dashed line while re-analysing; ◆ markers on warnings and dangers;
+  the selected hazard glows. Saved routes that are not open are thin
+  dashed lines in their worst-severity colour; tap one to open it.
+- **Editing like Google Maps, made for touch**:
+  - drag **A**, **B** (34 px handles) or a waypoint to move it (A/B
+    snap again on drop);
+  - drag a **+** midpoint handle, or grab **the line itself** anywhere
+    within 16 px, to insert a waypoint there. The line grab uses pointer
+    events captured on the map container (map panning is paused while
+    dragging), so it works with a finger and needs no right-click or
+    long-press;
+  - tap a waypoint → popup → *Remove waypoint*.
+  A dashed preview follows the finger; only the drop changes the draft.
+- **Panel** (`components/RoutePanel.jsx`, same side panel / bottom
+  sheet as the location panel; the grip collapses it on phones): name,
+  A and B with their kind, distance, duration, gain/loss, radiation dose,
+  max slope, hazard counts, travel mode, *Save route* / *Save changes*,
+  two-step *Delete*, the editing hint, the **elevation profile**
+  (`RouteProfile.jsx`: hazard stretches shaded, waypoints dashed, tap to
+  put a cursor on the map), the **hazard list** (severity, stretch,
+  value, limit crossed; tap → description, the map flies to it and
+  highlights it), the data/resolution used and the method, and notes.
+- **Routes tab** (`components/RoutesPanel.jsx`): *New route* and the
+  saved routes with mode, distance and danger/warning counts.
+- Fitting a route or hazard keeps it clear of the panel (right 420 px on
+  desktop, lower half on phones); on phones the sidebar folds away when
+  a route starts.
+
 ### Layout
 
-`components/Sidebar.jsx` has three tabs: **Layers**, **POIs** and
-**Zones**, and can be collapsed (▸). On screens ≤ 700 px it starts
+`components/Sidebar.jsx` has four tabs: **Layers**, **POIs**,
+**Routes** and **Zones**, and can be collapsed (▸). On screens ≤ 700 px it starts
 collapsed and leaves room for the zoom buttons, and the legend panel
 moves to the bottom of the screen.
 
@@ -245,12 +298,22 @@ that lists the credits of the layers switched on *and drawn at the current
 zoom*, the credit lines of the label groups that are on (`/api/map` →
 `labelCredits`) and Leaflet. Close it with ✕, the pill or `Esc`. The
 bottom-right stack, from the bottom up, is: Credits (12 px), coordinates
-readout (56 px), **＋ POI** (124 px). The legend panel always ends above
-it.
+readout (56 px), **＋ POI** (124 px), **↝ Route** (192 px). The legend
+panel always ends above it.
 
 ---
 
 ## 4. Features
+
+Phase 3:
+
+- Manual routes A → B between POIs, labels or any point, with
+  snapping; great-circle line analysed by the backend.
+- Line coloured by hazard severity, hazard markers, hazard list and an
+  elevation profile with hazard zones; tap a hazard to fly to it.
+- Touch-first editing: drag the line or a + handle to add a waypoint,
+  drag handles to move, popup to remove; live re-analysis.
+- Travel mode (on foot / rover), save, edit, delete; Routes tab.
 
 Phase 2:
 
@@ -304,16 +367,19 @@ frontend/
     │   ├── useBackendData.js # loads health, map, layers, zones, label and POI categories
     │   ├── useLayerState.js  # visible / opacity / order per layer (localStorage)
     │   ├── useLabelState.js  # which label groups are on (localStorage)
-    │   └── usePois.js        # POI list + create / update / delete
+    │   ├── usePois.js        # POI list + create / update / delete
+    │   ├── useRoutes.js      # saved routes + travel modes, create / update / delete
+    │   └── useRouteAnalysis.js # debounced live analysis of the route being edited
     ├── map/
     │   ├── crs.js            # Mars CRS (EPSG4326 grid + Mars radius), m/px helper
     │   ├── hash.js           # #zoom/lat/lon helpers
     │   ├── declutter.js      # measureText, grid index, greedy label placement
     │   ├── poiIcons.js       # SVG icons per POI type
-    │   └── poiVisibility.js  # createdZoom → full / dot / hidden
+    │   ├── poiVisibility.js  # createdZoom → full / dot / hidden
+    │   └── routes.js         # severity colours, tap snapping, unwrapping, formatting
     └── components/
         ├── MarsMap.jsx       # MapContainer + TileLayers from /api/layers
-        ├── Sidebar.jsx       # tabs: Layers / POIs / Zones, collapsible
+        ├── Sidebar.jsx       # tabs: Layers / POIs / Routes / Zones, collapsible
         ├── LayersPanel.jsx   # switches, opacity, order, label groups
         ├── LegendPanel.jsx   # legends of the visible layers
         ├── FeatureLabels.jsx # fetch + declutter + draw map labels
@@ -324,6 +390,10 @@ frontend/
         ├── PointQuery.jsx    # map tap → location query + marker
         ├── PointPanel.jsx    # generic /api/point renderer (side panel / bottom sheet)
         ├── Sparkline.jsx     # tiny SVG curve for an item's series
+        ├── RouteLayer.jsx    # route lines, coloured segments, handles, line dragging
+        ├── RoutePanel.jsx    # route details, stats, hazard list (side panel / bottom sheet)
+        ├── RouteProfile.jsx  # SVG elevation profile with hazard zones
+        ├── RoutesPanel.jsx   # Routes tab (new route, saved list)
         ├── CoordinatesReadout.jsx
         ├── HashView.jsx      # keeps the view in the URL hash
         ├── Header.jsx        # title + Earth/Mars badge
@@ -350,4 +420,7 @@ Rules of thumb for the team:
 | A layer is on but nothing shows | Its data may not exist at this place or zoom (THEMIS ±65°, coarse TES layers); check its opacity; in Mars mode it may not be in the offline pack. |
 | Layer settings look wrong after an update | Press *Reset* in the Layers tab (or clear `arturo.layers.v1` in localStorage). |
 | An error message in the POI sheet | The backend is down or rejected the input (the name is required, ≤ 60 characters). The message comes from the API. |
+| Taps on the map do nothing while a route is open | By design: the location panel is off while routing. Close the route (✕) to query points again. |
+| The route stays grey and dashed | It is being analysed, or the analysis failed: see the message in the panel (e.g. a route crossing 180° E/W is not supported). |
+| Dragging the line pans the map instead | Grab it within ~16 px of the line, or use the + handles. Only the route that is open can be edited. |
 | `npm install` fails on old Node | Install Node 20.19+ or 22.12+ (https://nodejs.org). |

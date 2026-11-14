@@ -9,8 +9,9 @@ that the frontend never sees.
 - [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/)
 - Interactive API docs (Swagger) at **http://localhost:8000/docs** while it runs
 - Serves: map tiles for 16 Mars layers, layer metadata and legends, map
-  labels (IAU names, landing sites, exploration zones) and user points of
-  interest (POIs).
+  labels (IAU names, landing sites, exploration zones), user points of
+  interest (POIs), exact values at any point (`/api/point`) and
+  hand-drawn routes with their hazard analysis (`/api/routes`).
 
 ---
 
@@ -27,9 +28,10 @@ that the frontend never sees.
 9. [Map labels (`/api/features`)](#9-map-labels-apifeatures)
 10. [Points of interest (`/api/pois`)](#10-points-of-interest-apipois)
 11. [Point queries (`/api/point`)](#11-point-queries-apipoint)
-12. [Tests](#12-tests)
-13. [How to extend](#13-how-to-extend)
-14. [Troubleshooting](#14-troubleshooting)
+12. [Routes (`/api/routes`)](#12-routes-apiroutes)
+13. [Tests](#13-tests)
+14. [How to extend](#14-how-to-extend)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -117,6 +119,9 @@ against the folder you launch from.
 | `RASTERS_FILE` | `app/catalog/rasters.yaml` | Raster catalog: datasets, their sources in priority order, scale/offset, citations. |
 | `POINT_REMOTE_DEM` | `true` | Earth mode only: read the USGS 200 m DEM live (HTTP range requests) where no local 200 m crop exists. Ignored in Mars mode. |
 | `POINT_REMOTE_TIMEOUT_S` | `8` | Timeout of those remote reads; on failure the source is skipped for 5 minutes and MOLA is used. |
+| `ROUTE_STORE` | `json` | Route storage: `json` (file) or `memory`. |
+| `ROUTE_STORE_FILE` | `./data/routes/routes.json` | File used by the JSON route store. Created on first write; not in git. |
+| `ROUTES_FILE` | `app/catalog/routes.yaml` | Travel modes, hazard thresholds and sampling settings for route analysis (see [§12](#12-routes-apiroutes)). |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Allowed browser origins if the frontend is served from another origin without the Vite proxy. Methods GET, POST, PUT and DELETE are allowed. |
 
 ---
@@ -180,6 +185,14 @@ camelCase.
 | DELETE | `/api/pois/{id}` | Delete → `204` (404 if unknown). |
 | GET | `/api/pois/categories` | The 5 POI icon types with label, description and colour. |
 | GET | `/api/point?lat=&lon=[&ls=][&tau=]` | Everything known about one location, from numeric GeoTIFFs and models: sections of `{value, unit, source, resolution, method, notes, noData, estimate}`. `lat` −90…90, `lon` −360…360 (wrapped), `ls` 0…<360 (default: today on Mars), `tau` 0…5 (default 0.5). See [§11](#11-point-queries-apipoint). |
+| GET | `/api/routes` | Saved routes as a GeoJSON FeatureCollection of LineStrings (`properties.stats` = summary of the last analysis). |
+| POST | `/api/routes` | Create a route. Body: `{name, notes, mode, start, end, waypoints, createdZoom}` → `201` + Feature. Analysed on save. `422` on invalid input or a line that cannot be analysed. |
+| GET | `/api/routes/{id}` | One route (404 if unknown). |
+| PUT | `/api/routes/{id}` | Replace a route (same body as POST); re-analysed. |
+| DELETE | `/api/routes/{id}` | Delete → `204`. |
+| GET | `/api/routes/{id}/analysis[?ls=]` | Full analysis of a saved route. |
+| POST | `/api/routes/analyze` | Analyse a line without saving it. Body: `{coordinates: [[lon, lat], …], mode, ls?}` (2–202 vertices). See [§12](#12-routes-apiroutes). |
+| GET | `/api/routes/config` | Travel modes, hazard thresholds and sampling settings (`routes.yaml`). |
 
 Example `GET /api/layers` item:
 
@@ -219,8 +232,8 @@ and a debug header `X-Tile-Origin: remote | cache | local`.
 `/api/health` also reports `pointRaster`, e.g. `local GeoTIFF (6/7
 datasets) + remote 200 m DEM (USGS)`.
 
-Planned for a later phase: `POST /api/route` (A* route over
-slope/hazards).
+Automatic route suggestions (least-cost paths over the same hazards)
+are planned for a later phase; Phase 3 analyses routes drawn by hand.
 
 ---
 
@@ -231,11 +244,13 @@ backend/
 ├── app/
 │   ├── main.py              # creates the FastAPI app, CORS, routers, provider lifecycle
 │   ├── core/config.py       # Settings (env vars / .env)
-│   ├── api/                 # HTTP layer only (thin): health, layers, tiles, map, features, pois, point
+│   ├── api/                 # HTTP layer only (thin): health, layers, tiles, map, features, pois, point, routes
 │   ├── catalog/
 │   │   ├── layers.yaml      # WHICH layers exist and where they come from
 │   │   ├── map.yaml         # initial view, zoom limits, detail zones
 │   │   ├── rasters.yaml     # numeric GeoTIFF datasets for /api/point (sources by priority)
+│   │   ├── routes.yaml      # travel modes + hazard thresholds for route analysis
+│   │   ├── routes_config.py # loads routes.yaml
 │   │   ├── registry.py      # loads/validates layers.yaml
 │   │   └── map_config.py    # loads map.yaml
 │   ├── models/              # Pydantic models (internal config vs public contract)
@@ -246,12 +261,13 @@ backend/
 │   │   ├── cached.py        # CachedTileProvider  (disk cache decorator)
 │   │   └── factory.py       # build_tile_provider(): the Earth/Mars switch
 │   ├── rasters/             # WHERE point values come from (twin of providers/)
-│   │   ├── base.py          # RasterSource interface + RasterWindow
+│   │   ├── base.py          # RasterSource interface + RasterWindow + RasterGrid (block reads)
 │   │   ├── geotiff.py       # GeoTIFF (local or /vsicurl/), multi-file, layered + circuit breaker
 │   │   └── factory.py       # build_raster_datasets(): remote only in Earth mode
 │   ├── repositories/
 │   │   ├── features.py      # FeatureRepository + GeoJSON-folder implementation
-│   │   └── pois.py          # PoiRepository + memory / JSON-file implementations
+│   │   ├── pois.py          # PoiRepository + memory / JSON-file implementations
+│   │   └── routes.py        # RouteRepository + memory / JSON-file implementations
 │   └── services/
 │       ├── tiles.py         # TileService: validate → provider → transforms
 │       ├── transforms.py    # post-processing (e.g. transparent no-data)
@@ -260,7 +276,9 @@ backend/
 │       ├── terrain.py       # slope (Horn), aspect, roughness
 │       ├── thermal.py       # 1-D surface temperature model
 │       ├── environment.py   # pressure, radiation, water boiling point
-│       └── mars_time.py     # Ls, Mars Year, local solar time (Mars24)
+│       ├── mars_time.py     # Ls, Mars Year, local solar time (Mars24)
+│       ├── geodesy.py       # great-circle distance and densification on the Mars sphere
+│       └── route_analysis.py # RouteAnalyzer: profile, stats, hazards, coloured segments
 ├── scripts/
 │   ├── prefetch_tiles.py    # builds offline tile packs
 │   ├── build_features.py    # rebuilds the label GeoJSON from USGS / Mars Trek
@@ -268,6 +286,7 @@ backend/
 ├── data/features/           # label GeoJSON (in git, ~0.8 MB) + README with sources
 ├── data/rasters/            # numeric GeoTIFFs for /api/point (in git, ~61 MB) + README
 ├── data/pois/               # user POIs (pois.json, not in git)
+├── data/routes/             # user routes (routes.json, not in git)
 ├── data/tiles/              # offline packs (contents not in git)
 ├── cache/                   # remote-mode tile cache (not in git)
 └── tests/                   # pytest, fully offline
@@ -697,7 +716,156 @@ top of the script.
 
 ---
 
-## 12. Tests
+## 12. Routes (`/api/routes`)
+
+Phase 3: the astronaut draws a route by hand (A → waypoints → B) and the
+backend says what is dangerous along it. There is no automatic
+pathfinding yet.
+
+### Model
+
+A route is a GeoJSON `Feature` with a `LineString` `[A, waypoints…, B]`
+(`[lon, lat]`, longitudes in −180…180). Properties:
+
+| Field | Meaning |
+|---|---|
+| `name` (1–60), `notes` (≤ 2000) | Free text (trimmed). |
+| `mode` | Travel mode id from `routes.yaml` (`walking`, `rover`). |
+| `start`, `end` | `{kind: poi \| feature \| point, refId, name, lat, lon}`: what A and B were snapped to. The coordinates are copied, so a route survives its POI being deleted. |
+| `createdZoom` | Map zoom when it was saved. |
+| `stats` | Summary of the last analysis: `distanceM, durationH, doseMsv, gainM, lossM, maxSlopeDeg, maxSeverity, hazardCounts, mode, resolution, analyzedAt`. |
+| `createdAt`, `updatedAt` | UTC timestamps. |
+
+Storage: `RouteRepository` (`repositories/routes.py`) with memory and
+JSON-file implementations (atomic writes, `{"version": 1, "routes": […]}`),
+chosen by `ROUTE_STORE` — the same pattern as POIs. Every POST/PUT runs
+the analyser and stores its summary; the full analysis is computed on
+demand (`/analyze`, `/{id}/analysis`) because it depends on the season.
+
+### Analysis (`services/route_analysis.py`)
+
+`POST /api/routes/analyze {coordinates, mode, ls?}` returns:
+
+```jsonc
+{
+  "mode": "walking", "modeLabel": "On foot (EVA suit)", "ls": 22.1,
+  "distanceM": 12718, "durationH": 8.63, "doseMsv": 0.24,
+  "gainM": 997, "lossM": 19, "minElevationM": -4502, "maxElevationM": -3523,
+  "maxSlopeDeg": 17.1, "maxGradeDeg": 16.0, "nightMinC": -97,
+  "sampleSpacingM": 199, "resolution": "200 m/px HRSC+MOLA blended DEM v2 (local detail-zone crop) (100 %)",
+  "data": [{ "name": "…", "resolutionM": 200, "share": 1.0 }],
+  "maxSeverity": "warning", "hazardCounts": { "info": 0, "warning": 6, "danger": 0 },
+  "hazards": [{
+    "id": "h2", "type": "slope", "severity": "warning", "title": "Steep slope",
+    "description": "Terrain slope up to 17° (On foot (EVA suit): difficult from 15°, impassable from 25°). …",
+    "value": 17.1, "unit": "°", "threshold": 15, "scope": "segment",
+    "fromM": 9539, "toM": 9737, "lat": -4.77, "lon": 137.41, "coordinates": [[137.41, -4.77], …]
+  }, …],
+  "segments": [{ "fromM": 0, "toM": 9141, "level": "ok", "noData": false, "coordinates": [[…], …] }, …],
+  "profile": [{ "d": 0, "lat": -4.59, "lon": 137.44, "elevation": -4501, "slope": 2.0, "grade": 3.4, "level": "ok" }, …],
+  "vertices": [[137.4417, -4.5895], [137.4, -4.8]], "vertexDistancesM": [0, 12718],
+  "method": "…"
+}
+```
+
+How it is computed:
+
+1. **Geometry.** Each leg is a **great circle** on the Mars sphere
+   (R = 3,396.19 km), densified by spherical interpolation
+   (`services/geodesy.py`). Distances are exact great-circle lengths;
+   vertices are always samples, so waypoints line up with the profile.
+2. **Sample spacing follows the data.** The analyser reads one DEM block
+   over the route's bounding box from every elevation source
+   (`RasterSource.read_grids`): local 200 m crops (Gale, Jezero), the live
+   USGS 200 m DEM in Earth mode, and MOLA 16 px/° (~3.7 km). Spacing =
+   max(`min_spacing_m` 50 m, best resolution found, length /
+   `max_samples` 2,500). The response says which data covered what share
+   of the route (`data`, `resolution`).
+3. **Per sample**: bilinear elevation; terrain slope (Horn's method on the
+   block, metric pixel size per row); roughness (RMS of the residual after
+   fitting a plane in a 5×5-pixel window); along-track grade; thermal
+   inertia, albedo and dust cover index (nearest pixel); pressure and
+   cosmic-ray dose rate (Phase 2 models); night minimum surface
+   temperature from the Phase 2 thermal model, run at 16 points and
+   interpolated. Each sample uses the best source that has data there.
+4. **Time and dose.** Speed = mode speed × grade factor: walking uses
+   **Tobler's hiking function** normalised to flat ground
+   (`exp(−3.5·|tan θ + 0.05|) / exp(−0.175)`), the rover slows linearly
+   to 20 % at the impassable grade. Time is summed per sample step; the
+   trip dose integrates the dose rate over that time (unknown rate →
+   worst case, 0.92 mSv/day).
+5. **Hazards** are contiguous stretches where a value crosses a
+   threshold (one-sample gaps are bridged). Each one reports severity
+   (highest reached), `fromM`/`toM` along the route, the worst point
+   (`lat`, `lon`, `value`) and the limit crossed (`threshold`).
+6. **Segments**: each sample gets the worst level of the hazards on it;
+   consecutive samples with the same level (and no-data flag) form a
+   segment for colouring. `info` is drawn as ok.
+7. The profile is downsampled to ≤ 600 points for the chart.
+
+### Hazards and thresholds (`app/catalog/routes.yaml`)
+
+| Hazard (`type`) | Rule (defaults) | Severity |
+|---|---|---|
+| `slope` | Terrain slope ≥ 15° difficult, ≥ 25° impassable (per mode) | warning / danger |
+| `grade` | Along-track climb or descent ≥ 8° / ≥ 15° | info / warning |
+| `roughness` | Detrended RMS height ≥ 15 m / ≥ 40 m, scaled to a 1 km window as (window / 1 km)^0.7 | warning / danger |
+| `soft_ground` | Thermal inertia < 100 (loose dust / fine sand) | warning (rover), info (walking) |
+| `dust` | Dust cover index ≤ 0.94 | info |
+| `cold` | Night minimum ≤ −100 °C / ≤ −120 °C at the chosen season | warning / danger |
+| `low_pressure` | Estimated pressure < 400 Pa / < 200 Pa | info / warning |
+| `radiation_rate` | Cosmic-ray dose rate ≥ 0.8 mSv/day | warning |
+| `crater_rim` | Crossing the rim of a named IAU crater ≥ 1 km (warning if ≥ 5 km) | info / warning |
+| `no_data` | No elevation data | warning |
+| `coarse_data` | Elevation pixel > 1 km (not coloured) | info |
+| `walk_back` | Rover farther than 10 km (straight line) from A | warning |
+| `duration` (route) | Longer than the mode's excursion limit (8 h on foot, 10 h rover) | warning |
+| `route_dose` (route) | Trip dose ≥ 1 mSv / ≥ 10 mSv | warning / danger |
+
+Travel modes:
+
+| Mode | Speed | Speed model | Slope difficult / impassable | Max excursion | Extra |
+|---|---|---|---|---|---|
+| `walking` — On foot (EVA suit) | 2 km/h | Tobler | 15° / 25° | 8 h | — |
+| `rover` — Pressurised rover | 8 km/h | linear | 15° / 25° | 10 h | walk-back 10 km |
+
+Where the numbers come from (also commented in the YAML): Apollo
+moonwalk speeds (~1–3 km/h with stops) and crew reports that 10–15°
+slopes on loose regolith were very tiring; the angle of repose of loose
+granular material (~30–35°), so > 25° is not walkable; the Apollo LRV
+design slope (25°) and typical speed (~8 km/h); Curiosity/Perseverance
+planners treating ~15–20° as risky; ISS/Apollo EVA durations (7–8 h);
+the Apollo walk-back rule (~10 km); Spirit's soft-soil entrapment
+(2009) for low thermal inertia; Ruff & Christensen 2002 for the dust
+cover index; Orosei et al. 2003 for the km-scale Hurst exponent. They
+are **planning assumptions**: change them in `routes.yaml`; nothing in
+code or in the frontend needs to change (the frontend reads
+`/api/routes/config`).
+
+### Resolution caveats
+
+- **200 m** only inside the Gale/Jezero crops, or from the live USGS DEM
+  in Earth mode when the route's block is small: that DEM is read row by
+  row over HTTP (one request per row; measured ~2 s for 34 rows, ~25 s
+  for 120), so blocks taller than `remote_max_rows` (80) are read from
+  the overviews at ≤ 2× decimation, and beyond that the remote DEM is
+  skipped and **MOLA ~3.7 km** is used. Mars mode never uses the network.
+- On MOLA, slope is a kilometre-scale average (real local slopes are
+  steeper), roughness describes km-scale relief, and a *coarse data*
+  info hazard is added.
+- Rims are circles from the IAU centre/diameter; temperature, pressure
+  and radiation are the Phase 2 estimates; nothing about rocks smaller
+  than a DEM pixel, lighting or communications.
+- Routes may not cross the ±180° meridian (`422`).
+
+### Performance
+
+Typical analysis: 0.2–1 s for 10–40 km at 200 m (local crop), ~3 s the
+first time a live-DEM block is read. Endpoints are synchronous and run
+in FastAPI's thread pool; the frontend debounces and aborts requests
+while the user drags.
+
+## 13. Tests
 
 ```bash
 pip install -r requirements-dev.txt
@@ -722,9 +890,20 @@ and a half-covered albedo map) into a temp folder and checks the
 the pressure, boiling-point, radiation, Mars-calendar (Mars24 reference
 epoch) and thermal-model numbers. No committed data, no network.
 
+`tests/test_routes.py` writes a fixture DEM (0.01° pixels) with a **30°
+ramp** between 0.40° and 0.50° E, its own raster catalog and a fixture
+crater, then checks: the impassable-slope hazard and the red segment
+start/end at the expected distances (within one pixel of Horn smoothing
+on each side), exact great-circle distance, sample spacing = DEM
+resolution, elevation gain, the reported threshold, crater rim
+crossings, *no data* beyond the DEM, walking vs rover speed and dose,
+validation errors (one vertex, zero length, unknown mode), the
+great-circle helpers, memory/JSON route stores (restart) and the full
+CRUD contract (201 + LineString + stats, PUT re-analyses, 204, 404).
+
 ---
 
-## 13. How to extend
+## 14. How to extend
 
 ### Add a new raster layer (e.g. MOLA hillshade, THEMIS)
 
@@ -765,10 +944,20 @@ category in `services/features.py` (`minZoom`, priority bonus).
 
 Implement `PoiRepository` (5 methods) and add a branch in
 `build_poi_repository()`. The API and the frontend don't change.
+Routes work the same way: `RouteRepository` and
+`build_route_repository()`.
+
+### Tune or add a route hazard
+
+Thresholds and travel modes: edit `app/catalog/routes.yaml` and restart.
+A new hazard type: compute its per-sample values in
+`RouteAnalyzer.analyze()` and call `add(type, mask, values, severity_fn,
+title_fn, description_fn, unit, threshold)`; it appears in the list, the
+profile and the line colours with no frontend change.
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -786,4 +975,7 @@ Implement `PoiRepository` (5 methods) and add a branch in
 | `pip install` tries to compile rasterio / GDAL | Upgrade pip (`pip install -U pip`): rasterio ≥ 1.4.3 ships manylinux, macOS and Windows wheels with GDAL inside (1.5.x also for Python 3.14). No system GDAL is needed. |
 | `/api/point` says "Dataset not installed" | The GeoTIFF is missing from `RASTERS_DIR` (e.g. a partial clone): `git pull` or `python -m scripts.build_rasters --only <name>`. |
 | Point panel slow (1–2 s) in Earth mode away from Gale/Jezero | That is the live 200 m DEM over HTTP. Set `POINT_REMOTE_DEM=false` to use the local MOLA grid only, or build a local crop with `build_rasters.py --only elevation --zones <zone>`. |
+| Route analysis says MOLA ~3.7 km although I am in Earth mode | The route's DEM block is too tall for the live 200 m DEM (≥ ~80 rows / ~30 km N–S). Split it, or build a local 200 m crop with `build_rasters.py --only elevation --zones <zone>`. |
+| `422` "routes crossing the ±180° meridian are not supported yet" | Not supported yet: split the route at 180°. |
+| Routes vanish on restart | `ROUTE_STORE=memory` is set; use `json`. |
 | A few CTX tiles near 80–88° N/S return 404 | Upstream sends some of them truncated; the backend treats them as no data so the Viking layer shows through. |
