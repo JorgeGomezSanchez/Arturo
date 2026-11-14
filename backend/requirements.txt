@@ -1,0 +1,9 @@
+# ------------------------------------------------------------
+# Arturo backend dependencies (Python 3.10+)
+# Install with:  pip install -r requirements.txt
+# ------------------------------------------------------------
+
+# --- Phase 1: server and tile proxy ---
+fastapi>=0.110,<1.0          # API framework (automatic docs at /docs)
+uvicorn[standard]>=0.29      # ASGI server that runs FastAPI
+pydantic-settings>=2.2       # typed configuration from environment variables / .env

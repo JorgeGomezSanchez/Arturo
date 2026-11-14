@@ -1,0 +1,20 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python / tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Downloaded tile cache (rebuilt automatically)
+cache/
+
+# Heavy local data (offline tile packs, GeoTIFFs...)
+# Only the folder structure and READMEs are versioned, never the data.
+data/tiles/*
+!data/tiles/.gitkeep
+!data/tiles/README.md
