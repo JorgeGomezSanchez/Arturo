@@ -384,3 +384,116 @@ layers:
         - { name: "Putzig et al. (2005), Icarus 173, 325-341", url: "https://doi.org/10.1016/j.icarus.2004.08.017" }
     source:
       url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  # -------------------------------------------------------------------
+  # SURFACE PROPERTIES (dust, brightness, roughness)
+  # -------------------------------------------------------------------
+  - id: tes_albedo
+    name: "Surface albedo (TES, ~7.4 km)"
+    description: >-
+      Bolometric albedo (how much sunlight the surface reflects) from the
+      TES visible/near-IR channel (Mars Global Surveyor). Bright regions
+      are usually dust-covered; dark regions are sand and rock.
+    group: overlay
+    category: surface
+    resolution_m: 7410
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.75
+    z_index: 30
+    attribution: "TES albedo: NASA/JPL/ASU · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Surface albedo (reflectivity)"
+      quantitative: false
+      min_label: "Dark: sand, rock (typ. ≈ 0.1)"
+      max_label: "Bright: dust, frost (typ. ≈ 0.3)"
+      stops:
+        - { color: "#1a1a1a" }
+        - { color: "#808080" }
+        - { color: "#f0f0f0" }
+      notes:
+        - "Bright = reflective = usually thick dust (or ice near the poles). Dark = sand, rock, less dust."
+        - "Typical values are indicative; exact greyscale stretch is not published with the tiles."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global Surface Albedo", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Christensen et al. (2001), TES experiment description, JGR 106(E10)", url: "https://doi.org/10.1029/2000JE001370" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_TES_Albedo_mosaic_global_7410m/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: tes_dust_cover_index
+    name: "Dust cover index (TES, ~3.5 km)"
+    description: >-
+      Relative abundance of spectrally obscuring dust on the surface,
+      derived from TES thermal-infrared spectra (Ruff & Christensen 2002).
+      Thick dust hides the rock underneath and is a hazard for solar
+      panels, seals and lungs.
+    group: overlay
+    category: surface
+    resolution_m: 3500
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 2 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.75
+    z_index: 31
+    attribution: "TES dust cover index: NASA/JPL/ASU (Ruff & Christensen 2002) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Surface dust cover"
+      quantitative: false
+      min_label: "Little dust"
+      max_label: "Thick dust"
+      stops:
+        - { color: "#5136ff" }
+        - { color: "#2d9ced" }
+        - { color: "#36bfcb" }
+        - { color: "#49f48f" }
+        - { color: "#aaf33e" }
+        - { color: "#f0ca39" }
+        - { color: "#fd822d" }
+        - { color: "#e26048" }
+      notes:
+        - "Warm colours = dusty (e.g. Tharsis, Arabia, Elysium); cool colours = little dust (e.g. Syrtis Major, Acidalia)."
+        - "Colour direction inferred by comparing with those well-known dusty / dust-poor regions; the numeric index (emissivity-based) is not published with the tiles."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global Dust Index", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Ruff & Christensen (2002), JGR 107(E12), 5127", url: "https://doi.org/10.1029/2001JE001580" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/tes_ruffdust/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: mola_roughness
+    name: "Surface roughness (MOLA, ~7.5 km)"
+    description: >-
+      Kilometre-scale terrain roughness from MOLA altimetry (Kreslavsky &
+      Head 2000), as an RGB composite of three baselines. Brighter = rougher
+      ground (harder to traverse and to land on).
+    group: overlay
+    category: surface
+    resolution_m: 7500
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.8
+    z_index: 32
+    attribution: "MOLA roughness: NASA/GSFC (Kreslavsky & Head 2000) · via NASA Mars Trek"
+    legend:
+      type: channels
+      title: "Roughness at three scales (RGB composite)"
+      quantitative: false
+      stops:
+        - { color: "#ff3030", label: "Red: roughness over 9.2 km" }
+        - { color: "#30d030", label: "Green: roughness over 2.4 km" }
+        - { color: "#3070ff", label: "Blue: roughness over 0.6 km" }
+      notes:
+        - "Overall brightness = overall roughness (dark = smooth plains, good for landing)."
+        - "Hue = at which scale it is rough: bluish = rough at short (0.6 km) scale; reddish = rough only at long (9.2 km) scale."
+        - "Very coarse (8 pixels/degree): a regional guide, not a footpath planner."
+      sources:
+        - { name: "NASA Mars Trek product: MGS MOLA, Global Surface Roughness", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Kreslavsky & Head (2000), JGR 105(E11), 26695-26711", url: "https://doi.org/10.1029/2000JE001259" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/mola_roughness/1.0.0/default/default028mm/{z}/{y}/{x}.png"
