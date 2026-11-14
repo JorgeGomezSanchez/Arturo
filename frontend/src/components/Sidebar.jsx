@@ -8,7 +8,10 @@ import { useState } from 'react'
  * tabs = [{ id, label, badge?, content }]
  */
 export default function Sidebar({ header, tabs, activeTab, onTabChange }) {
-  const [collapsed, setCollapsed] = useState(false)
+  // Start collapsed on phones so the map is visible first.
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches,
+  )
   const current = tabs.find((t) => t.id === activeTab) ?? tabs[0]
   return (
     <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
