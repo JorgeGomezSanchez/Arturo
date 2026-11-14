@@ -1,0 +1,117 @@
+# =====================================================================
+#  Numeric raster catalog for point queries (GET /api/point)
+# =====================================================================
+#  Each dataset lists its SOURCES in priority order (best resolution
+#  first). The backend uses the first source that has a value at the
+#  point. Built by scripts/build_rasters.py; see data/rasters/README.md.
+#
+#  source fields:
+#    kind        local | remote
+#                  local  -> file under RASTERS_DIR (glob allowed)
+#                  remote -> https:// GeoTIFF read with HTTP range requests;
+#                            only used when DATA_SOURCE=remote and
+#                            POINT_REMOTE_DEM=true (never in Mars mode)
+#    path / url  where the GeoTIFF lives
+#    name        shown in the UI next to the value
+#    resolution_m  ground pixel size at the equator
+#    scale, offset value = raw * scale + offset (integer encodings)
+#    bands       1-based band numbers to read (default [1])
+#  Swapping a source (e.g. a habitat database) = editing this file and,
+#  for a new kind, one class in app/rasters/ + one branch in factory.py.
+# =====================================================================
+
+datasets:
+  elevation:
+    title: "Elevation"
+    units: "m"
+    citation: "MOLA: Smith et al. 2001 (JGR 106, E10); HRSC+MOLA blend: Fergason, Hare & Laura 2018 (USGS Astrogeology)"
+    sources:
+      - id: hrsc_mola_200m_zone
+        kind: local
+        path: "zones/*_hrsc_mola_200m.tif"
+        name: "HRSC+MOLA blended DEM v2 (local detail-zone crop)"
+        resolution_m: 200
+      - id: hrsc_mola_200m_usgs
+        kind: remote
+        url: "https://planetarymaps.usgs.gov/mosaic/Mars/HRSC_MOLA_Blend/Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.tif"
+        name: "HRSC+MOLA blended DEM v2 (USGS, live)"
+        resolution_m: 200
+      - id: mola_megdr_16ppd
+        kind: local
+        path: "mola_megdr_16ppd_elevation.tif"
+        name: "MGS MOLA MEGDR (16 px/°)"
+        resolution_m: 3705
+
+  thermal_inertia_night:
+    title: "Thermal inertia (nightside)"
+    units: "J m⁻² K⁻¹ s⁻½"
+    citation: "Putzig & Mellon 2007, Icarus 191, 68-94, doi:10.1016/j.icarus.2007.05.013"
+    sources:
+      - id: tes_ti_night_2007
+        kind: local
+        path: "tes_ti_night_2007_20ppd.tif"
+        name: "MGS TES thermal inertia 2007, nightside (PDS MGS-M-TES-5-TIMAP-V1.0)"
+        resolution_m: 2964
+
+  thermal_inertia_day:
+    title: "Thermal inertia (dayside)"
+    units: "J m⁻² K⁻¹ s⁻½"
+    citation: "Putzig & Mellon 2007, Icarus 191, 68-94, doi:10.1016/j.icarus.2007.05.013"
+    optional: true
+    sources:
+      - id: tes_ti_day_2007
+        kind: local
+        path: "tes_ti_day_2007_20ppd.tif"
+        name: "MGS TES thermal inertia 2007, dayside (PDS MGS-M-TES-5-TIMAP-V1.0)"
+        resolution_m: 2964
+
+  albedo:
+    title: "Albedo"
+    units: ""
+    citation: "Christensen et al. 2001, JGR 106(E10), 23823-23871, doi:10.1029/2000JE001370"
+    sources:
+      - id: tes_albedo_8ppd
+        kind: local
+        path: "tes_albedo_8ppd.tif"
+        name: "MGS TES Lambert albedo (USGS Astropedia mosaic)"
+        resolution_m: 7410
+        scale: 0.0001
+
+  dust_cover_index:
+    title: "Dust cover index"
+    units: ""
+    citation: "Ruff & Christensen 2002, JGR 107(E12), 5127, doi:10.1029/2001JE001580"
+    sources:
+      - id: tes_dci_16ppd
+        kind: local
+        path: "tes_dci_16ppd.tif"
+        name: "MGS TES dust cover index (ASU)"
+        resolution_m: 3705
+        scale: 0.0006
+        offset: 0.85
+
+  minerals:
+    title: "TES mineral abundances"
+    units: "areal fraction"
+    citation: "Bandfield 2002, JGR 107(E6), 5042, doi:10.1029/2001JE001510"
+    sources:
+      - id: tes_minerals_4ppd
+        kind: local
+        path: "tes_minerals_4ppd.tif"
+        name: "MGS TES mineral maps (Bandfield 2002, ASU)"
+        resolution_m: 14820
+        scale: 0.0001
+        bands: [1, 2, 3, 4, 5]
+        band_names: [plagioclase, high_ca_pyroxene, hematite, sheet_silicates_glass, surface_dust]
+
+  geologic_unit:
+    title: "Geologic unit"
+    units: ""
+    citation: "Tanaka et al. 2014, Geologic map of Mars, USGS SIM 3292, doi:10.3133/sim3292"
+    legend: "sim3292_units_16ppd.json"
+    sources:
+      - id: sim3292_16ppd
+        kind: local
+        path: "sim3292_units_16ppd.tif"
+        name: "USGS SIM 3292 global geologic map (1:20M), rasterised at 16 px/°"
+        resolution_m: 3705
