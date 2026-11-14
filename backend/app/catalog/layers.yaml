@@ -618,3 +618,112 @@ layers:
     source:
       url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Glass_Clay/1.0.0/default/default028mm/{z}/{y}/{x}.png"
 
+  # -------------------------------------------------------------------
+  # GEOLOGY — USGS SIM 3292 global geologic map (Tanaka et al. 2014)
+  # Served by Mars Trek's ArcGIS WMTS. Legend colours were read from the
+  # service's own legend (MapServer/legend?f=json), unit by unit.
+  # -------------------------------------------------------------------
+  - id: geologic_map_sim3292
+    name: "Geologic map (USGS SIM 3292)"
+    description: >-
+      Global geologic map of Mars (Tanaka et al. 2014, USGS Scientific
+      Investigations Map 3292), 1:20,000,000. Colours = geologic units by
+      age (Noachian = oldest, Hesperian, Amazonian = youngest) and setting
+      (highland, lowland, volcanic, polar, basin...).
+    group: overlay
+    category: geology
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 11 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.6
+    z_index: 50
+    attribution: "Geologic map: Tanaka et al. 2014, USGS SIM 3292 · via NASA Mars Trek"
+    legend:
+      type: categorical
+      title: "Geologic units"
+      quantitative: true
+      notes:
+        - "Ages: Noachian (> ~3.7 Ga, oldest), Hesperian (~3.7-3.0 Ga), Amazonian (< ~3.0 Ga, youngest)."
+        - "Mapped at 1:20M scale: unit boundaries are only accurate to a few km."
+      sources:
+        - { name: "Tanaka et al. (2014), Geologic map of Mars, USGS SIM 3292", url: "https://doi.org/10.3133/sim3292" }
+        - { name: "NASA Mars Trek ArcGIS service legend (SIM3292_Global_Geology)", url: "https://trek.nasa.gov/mars/trekarcgis/rest/services/SIM3292_Global_Geology/MapServer/legend" }
+      stops:
+        - { color: "#fff100", label: "Amazonian and Hesperian impact unit" }
+        - { color: "#e9e4d8", label: "Amazonian and Hesperian transition undivided unit" }
+        - { color: "#f89569", label: "Amazonian and Hesperian volcanic" }
+        - { color: "#bda635", label: "Amazonian and Noachian apron unit" }
+        - { color: "#eed114", label: "Amazonian apron unit" }
+        - { color: "#9bb4be", label: "Amazonian polar undivided unit" }
+        - { color: "#009ccb", label: "Amazonian polar unit" }
+        - { color: "#cc7c58", label: "Amazonian volcanic edifice" }
+        - { color: "#f8aa9e", label: "Amazonian volcanic unit" }
+        - { color: "#99d4bf", label: "Early Amazonian basin unit" }
+        - { color: "#42a2ae", label: "Early Hesperian basin unit" }
+        - { color: "#eaccaf", label: "Early Hesperian highland unit" }
+        - { color: "#e0b026", label: "Early Hesperian transition unit" }
+        - { color: "#b27ab5", label: "Early Hesperian volcanic unit" }
+        - { color: "#8d8e82", label: "Early Noachian highland massif unit" }
+        - { color: "#b9875f", label: "Early Noachian highland unit" }
+        - { color: "#6da69f", label: "Hesperian and Noachian basin unit" }
+        - { color: "#ccc2bf", label: "Hesperian and Noachian highland undivided unit" }
+        - { color: "#fba61b", label: "Hesperian and Noachian transition unit" }
+        - { color: "#0089d0", label: "Hesperian polar edifice unit" }
+        - { color: "#80adbd", label: "Hesperian polar undivided unit" }
+        - { color: "#009cb2", label: "Hesperian polar unit" }
+        - { color: "#aae1fa", label: "Hesperian transition outflow unit" }
+        - { color: "#dcd5d2", label: "Hesperian transition undivided unit" }
+        - { color: "#ffdda3", label: "Hesperian transition unit" }
+        - { color: "#f36f21", label: "Hesperian volcanic edifice unit" }
+        - { color: "#ffd700", label: "Late Amazonian apron unit" }
+        - { color: "#daf2fd", label: "Late Amazonian polar cap unit" }
+        - { color: "#feeaba", label: "Late Amazonian polar dunes unit" }
+        - { color: "#ccb0a6", label: "Late Amazonian volcanic field unit" }
+        - { color: "#fabeb7", label: "Late Amazonian volcanic unit" }
+        - { color: "#9fb39f", label: "Late Hesperian basin unit" }
+        - { color: "#8cc640", label: "Late Hesperian lowland unit" }
+        - { color: "#ffcb0b", label: "Late Hesperian transition unit" }
+        - { color: "#cc9e8f", label: "Late Hesperian volcanic field unit" }
+        - { color: "#cc9e8f", label: "Late Hesperian volcanic unit" }
+        - { color: "#ceae88", label: "Late Noachian highland unit" }
+        - { color: "#8882bd", label: "Late Noachian volcanic unit" }
+        - { color: "#bdc031", label: "Middle Amazonian lowland unit" }
+        - { color: "#a0a498", label: "Middle Noachian highland massif unit" }
+        - { color: "#cd9d80", label: "Middle Noachian highland unit" }
+        - { color: "#a62e4d", label: "Noachian highland edifice unit" }
+        - { color: "#b5aaa6", label: "Noachian highland undivided unit" }
+        - { color: "#c9262e", label: "Noachian volcanic edifice unit" }
+    source:
+      url_template: "https://trek.nasa.gov/mars/trekarcgis/rest/services/SIM3292_Global_Geology/MapServer/WMTS/tile/1.0.0/SIM3292_Global_Geology/default/default028mm/{z}/{y}/{x}.png"
+
+  # -------------------------------------------------------------------
+  # HYDROLOGY
+  # -------------------------------------------------------------------
+  - id: valley_networks
+    name: "Valley networks (Hynek et al. 2010)"
+    description: >-
+      Global map of ancient valley networks carved by liquid water,
+      manually mapped on THEMIS day IR and MOLA (Hynek, Beach & Hoke 2010).
+      Mostly Noachian (> ~3.7 Ga): evidence of an early wetter climate.
+    group: overlay
+    category: hydrology
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 8 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 1.0
+    z_index: 70
+    attribution: "Valley networks: Hynek et al. 2010 · via NASA Mars Trek"
+    legend:
+      type: symbol
+      title: "Valley networks"
+      quantitative: true
+      stops:
+        - { color: "#ffffff", label: "Mapped valley (line)" }
+      notes:
+        - "Lines are ancient, dry valleys. They are scientific targets (past water), not present-day water sources."
+      sources:
+        - { name: "Hynek, Beach & Hoke (2010), JGR 115, E09008", url: "https://doi.org/10.1029/2009JE003548" }
+    source:
+      url_template: "https://trek.nasa.gov/mars/trekarcgis/rest/services/Hynek_Valley_Networks/MapServer/WMTS/tile/1.0.0/Hynek_Valley_Networks/default/default028mm/{z}/{y}/{x}.png"
