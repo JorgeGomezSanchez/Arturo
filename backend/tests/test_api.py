@@ -67,3 +67,9 @@ def test_map_and_zones(client):
 def test_root_is_an_api_index(client):
     body = client.get("/").json()
     assert body["docs"] == "/docs" and body["api"] == "/api"
+
+
+def test_map_exposes_label_credits(client):
+    credits = client.get("/api/map").json()["labelCredits"]
+    assert set(credits) == {"names", "landing_site", "exploration_zone"}
+    assert "IAU" in credits["names"]

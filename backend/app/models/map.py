@@ -37,6 +37,10 @@ class MapConfig(_Camel):
     bounds: Bounds
     # Zoom-based visibility rules for user POIs (see map.yaml).
     poi_visibility: PoiVisibility = PoiVisibility()
+    # Credit line per map-label group (names / landing_site /
+    # exploration_zone), shown in the frontend's Credits panel while that
+    # group of labels is on.
+    label_credits: dict[str, str] = {}
 
 
 class Zone(_Camel):

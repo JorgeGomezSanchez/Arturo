@@ -112,3 +112,14 @@ poi_visibility:
   label_zoom_margin: 2
   marker_zoom_margin: 5
   world_zoom: 3
+
+# ---------------------------------------------------------------------------
+#  Credits for the map labels (GET /api/map -> labelCredits)
+# ---------------------------------------------------------------------------
+# One line per label group of the Layers panel: "names" (all IAU place
+# names), "landing_site" and "exploration_zone". The frontend lists a line
+# in its Credits panel only while that group is switched on.
+label_credits:
+  names: "Place names: IAU Working Group for Planetary System Nomenclature · USGS Gazetteer of Planetary Nomenclature"
+  landing_site: "Landing sites: NASA, ESA and CNSA mission data (curated by Arturo)"
+  exploration_zone: "Exploration zones: NASA First Landing Site/Exploration Zone Workshop (2015) · via NASA Mars Trek (EZMars)"

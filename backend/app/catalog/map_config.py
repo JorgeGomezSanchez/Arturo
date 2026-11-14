@@ -19,7 +19,11 @@ def _raw() -> dict:
 
 def get_map_config() -> MapConfig:
     raw = _raw()
-    return MapConfig(**raw["map"], poi_visibility=PoiVisibility(**raw.get("poi_visibility", {})))
+    return MapConfig(
+        **raw["map"],
+        poi_visibility=PoiVisibility(**raw.get("poi_visibility", {})),
+        label_credits=raw.get("label_credits", {}),
+    )
 
 
 def get_zones() -> list[Zone]:
