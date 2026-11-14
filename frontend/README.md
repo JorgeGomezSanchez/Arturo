@@ -59,8 +59,18 @@ On startup the app loads, in parallel:
 | `GET /api/map` | CRS, Mars radius, initial view, zoom limits, bounds. |
 | `GET /api/layers` | Which tile layers to draw and all their Leaflet options. |
 | `GET /api/zones` | Entries of the "Detail zones" side menu. |
+| `GET /api/features/categories` | Label groups and counts for the Layers panel. |
+| `GET /api/pois/categories` | POI icon types and colours. |
 
-Then, for each base layer, it creates a Leaflet `TileLayer` with the
+After that it calls, as needed:
+
+| Request | When |
+|---|---|
+| `GET /api/features?bbox=&zoom=&limit=600` | When the view changes (debounced 120 ms; results cached per view). |
+| `GET /api/pois` | Once at startup and after each change. |
+| `POST` / `PUT` / `DELETE /api/pois…` | When you create, edit or delete a POI. |
+
+Then, for each layer, it creates a Leaflet `TileLayer` with the
 options **exactly as the backend sends them** (`tileUrl`, `tileSize`,
 `zoomOffset`, `minNativeZoom`, `maxNativeZoom`, `minZoom`, `maxZoom`,
 `opacity`, `zIndex`, `attribution`). Tiles are requested to
@@ -72,6 +82,12 @@ Consequences:
   `backend/app/catalog/layers.yaml`.
 - **Switching the backend from Earth (NASA APIs) to Mars (local data)
   never requires frontend changes.**
+
+On top of the backend options, the frontend adds only what the user
+chose: visibility, opacity and order (see *Layers panel* below). It also
+uses the layer's `coverage` as Leaflet `bounds` (no requests outside
+THEMIS ±65° or CTX ±88°) and its `blendMode` as a CSS class
+(`mix-blend-mode: multiply` for the shaded relief).
 
 ### Projection (CRS)
 
@@ -96,9 +112,105 @@ phase 1 catalog:
   Viking shows through,
 - zoom 14–16: the last CTX level is upscaled.
 
+### Layers panel and legends
+
+- `hooks/useLayerState.js` keeps, per layer, `visible`, `opacity` and the
+  order of the overlays. It starts from the backend's `defaultVisible`
+  and `opacity`, and saves the user's choices in `localStorage`
+  (`arturo.layers.v1`). Unknown or removed layers are ignored, so a
+  catalogue change never breaks a saved state. Overlays get
+  `zIndex = 10 + position`, always above the base imagery. *Reset*
+  restores the defaults.
+- `components/LayersPanel.jsx` groups layers by `category` (imagery,
+  topography, thermal, surface, composition, geology, hydrology). Each
+  row has a large switch, an opacity slider, ▲/▼ buttons to reorder, and
+  ⓘ to open its legend. Every control is a real button or slider, at
+  least 32–40 px, with no hover-only or right-click actions, so it is
+  usable on a touch screen.
+- `components/LegendPanel.jsx` (top right) shows the legends of the
+  visible layers. It renders `gradient` (colour bar + end labels),
+  `categorical` (scrollable list of colour swatches), `channels` (R/G/B
+  meanings) and `symbol`. When `quantitative` is `false` it shows a
+  *"Qualitative scale – read as relative values"* badge. It always lists
+  the notes and the linked sources.
+
+### Map labels and decluttering
+
+`components/FeatureLabels.jsx` draws the IAU names, landing sites and
+exploration zones:
+
+1. On every view change (120 ms debounce) it asks the backend for up to
+   600 candidates in the visible area plus 25 % padding, for the current
+   zoom. The backend has already removed the features that are too small
+   for this zoom, and sorts the rest by importance.
+2. `map/declutter.js` measures each label's text with a canvas
+   (`measureText`, cached) and places labels **greedily in priority
+   order**. A label is drawn only if its box (text + dot + 4 px margin)
+   does not overlap a box that is already placed. A 64 px grid index
+   keeps this fast. At most 160 labels are drawn.
+3. The boxes of the user's POIs are **reserved first**, so a feature
+   label never covers your own markers.
+4. Longitudes are shifted to the copy of the world nearest to the view
+   (`nearestLon`), so labels near ±180° are placed correctly.
+
+Result: zoomed out you see regions, big craters and landing sites; zoom
+in and smaller names appear as space frees up. Styles: landing sites
+(bold, orange), exploration zones (light blue), regions (spaced capitals,
+no dot), big features (bold) and normal. Click a label to see its type,
+diameter, name origin, source and a link. The Layers panel has switches
+for the three label groups (`hooks/useLabelState.js`, saved as
+`arturo.labels.v1`).
+
+### Points of interest (POIs)
+
+There is no right-click and no long-press, so it works the same with a
+mouse, a touch screen or a gloved finger:
+
+1. Tap the **＋ POI** button (bottom right). A banner says "Tap the map
+   to place a point of interest" (`Esc` or *Cancel* stops).
+2. Tap the map. A sheet opens with the icon type (resource, shelter,
+   hazard, vehicle, unknown, as big buttons), the **name** (the visible
+   tag, required, ≤ 60 characters) and **notes**. The current zoom is
+   saved as `createdZoom`.
+3. Tap a POI marker to see it, then *Edit* or *Delete*. Delete asks for
+   confirmation in the same sheet (two steps).
+
+The **POIs** tab lists every POI (world-view ones first, sorted by
+`createdZoom`) with its icon and a note on when it shows ("world view" or
+"label from zoom N"). Tap one
+to fly to it.
+
+Visibility (`map/poiVisibility.js`, numbers from `/api/map` →
+`poiVisibility`):
+
+- `createdZoom ≤ 3` → **world-view POI**: icon + name at every zoom.
+- otherwise, **local POI**: icon + name when `zoom ≥ createdZoom − 2`,
+  a small coloured dot when `zoom ≥ createdZoom − 5`, hidden below that.
+
+The App keeps a small state machine (`idle → placing → create | view →
+edit`) in `App.jsx`. All POI calls go through `hooks/usePois.js` →
+`api/client.js`.
+
+### Layout
+
+`components/Sidebar.jsx` has three tabs: **Layers**, **POIs** and
+**Zones**, and can be collapsed (▸). On screens ≤ 700 px it starts
+collapsed and leaves room for the zoom buttons, and the legend panel
+moves to the bottom of the screen.
+
 ---
 
-## 4. Features (phase 1)
+## 4. Features
+
+Phase 1b:
+
+- 16 layers, each one toggleable, with opacity and order, and a legend.
+- ~2,100 decluttered labels (IAU names, landing sites, exploration zones).
+- Manual POIs: create, view, edit and delete, with zoom-dependent
+  visibility.
+- Phone-friendly layout.
+
+Phase 1:
 
 - Whole-Mars 2D map with pan, zoom and LOD.
 - Cursor latitude/longitude readout (planetocentric, east-positive),
@@ -126,16 +238,31 @@ frontend/
     ├── App.jsx               # loading/error screens + layout
     ├── App.css / index.css   # styles (dark HUD over the map)
     ├── api/client.js         # THE ONLY file that knows the backend URL
-    ├── hooks/useBackendData.js   # loads health, map, layers, zones
+    ├── hooks/
+    │   ├── useBackendData.js # loads health, map, layers, zones, label and POI categories
+    │   ├── useLayerState.js  # visible / opacity / order per layer (localStorage)
+    │   ├── useLabelState.js  # which label groups are on (localStorage)
+    │   └── usePois.js        # POI list + create / update / delete
     ├── map/
     │   ├── crs.js            # Mars CRS (EPSG4326 grid + Mars radius), m/px helper
-    │   └── hash.js           # #zoom/lat/lon helpers
+    │   ├── hash.js           # #zoom/lat/lon helpers
+    │   ├── declutter.js      # measureText, grid index, greedy label placement
+    │   ├── poiIcons.js       # SVG icons per POI type
+    │   └── poiVisibility.js  # createdZoom → full / dot / hidden
     └── components/
         ├── MarsMap.jsx       # MapContainer + TileLayers from /api/layers
+        ├── Sidebar.jsx       # tabs: Layers / POIs / Zones, collapsible
+        ├── LayersPanel.jsx   # switches, opacity, order, label groups
+        ├── LegendPanel.jsx   # legends of the visible layers
+        ├── FeatureLabels.jsx # fetch + declutter + draw map labels
+        ├── PoiLayer.jsx      # POI markers (icon + name, dot, hidden)
+        ├── PoiIcon.jsx       # icon used in lists and forms
+        ├── PoiSheet.jsx      # create / view / edit / delete sheet
+        ├── PoiPanel.jsx      # POIs tab (list, fly-to)
         ├── CoordinatesReadout.jsx
         ├── HashView.jsx      # keeps the view in the URL hash
         ├── Header.jsx        # title + Earth/Mars badge
-        └── ZonesPanel.jsx    # detail-zones side menu
+        └── ZonesPanel.jsx    # detail-zones list (Zones tab)
 ```
 
 Rules of thumb for the team:
@@ -154,4 +281,8 @@ Rules of thumb for the team:
 | "Could not reach the Arturo backend" | Start the backend (`uvicorn app.main:app --port 8000` in `backend/`). Check `VITE_DEV_BACKEND` if you use another port. |
 | Grey/black map, no tiles | Open the browser DevTools → Network and look at `/api/tiles/...` responses. 502 = backend can't reach NASA (no Internet?): use cached tiles or Mars mode. |
 | Some black/empty squares at high zoom | CTX has small gaps; Viking should show through. Near the poles (beyond ±88°) only Viking exists. |
+| No labels | Check the switches under *Map labels* in the Layers tab, and `GET /api/features/categories` on the backend. |
+| A layer is on but nothing shows | Its data may not exist at this place or zoom (THEMIS ±65°, coarse TES layers); check its opacity; in Mars mode it may not be in the offline pack. |
+| Layer settings look wrong after an update | Press *Reset* in the Layers tab (or clear `arturo.layers.v1` in localStorage). |
+| An error message in the POI sheet | The backend is down or rejected the input (the name is required, ≤ 60 characters). The message comes from the API. |
 | `npm install` fails on old Node | Install Node 20.19+ or 22.12+ (https://nodejs.org). |
