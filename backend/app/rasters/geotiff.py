@@ -6,13 +6,15 @@ import glob
 import logging
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from app.rasters.base import RasterSource, RasterUnavailableError, RasterWindow, SourceInfo
+from app.rasters.base import RasterGrid, RasterSource, RasterUnavailableError, RasterWindow, SourceInfo
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +109,54 @@ class GeoTiffRasterSource(RasterSource):
             data = data[0]
         return RasterWindow(data=data, dlat=dlat, dlon=dlon, source=self.info, band_names=self.band_names)
 
+    def read_grids(self, south, west, north, east, pad_px=2, max_px=2000, remote_max_rows=80,
+                   remote_max_decimation=2):
+        west, east = _wrap_lon(west), _wrap_lon(east)
+        if east < west:  # crossing the antimeridian is not supported (yet)
+            west, east = -180.0, 180.0
+        with self._lock:
+            ds = self._open()
+            b = ds.bounds
+            if north < b.bottom or south > b.top or east < b.left or west > b.right:
+                return []
+            dlon, dlat = abs(ds.transform.a), abs(ds.transform.e)
+            c0 = int(np.floor((max(west, b.left) - b.left) / dlon)) - pad_px
+            c1 = int(np.ceil((min(east, b.right) - b.left) / dlon)) + pad_px
+            r0 = int(np.floor((b.top - min(north, b.top)) / dlat)) - pad_px
+            r1 = int(np.ceil((b.top - max(south, b.bottom)) / dlat)) + pad_px
+            c0, r0 = max(c0, 0), max(r0, 0)
+            c1, r1 = min(c1, ds.width), min(r1, ds.height)
+            rows, cols = r1 - r0, c1 - c0
+            if rows <= 0 or cols <= 0:
+                return []
+            # Remote GeoTIFFs like the USGS DEM have one row per strip, so
+            # every row is one HTTP range request: big blocks are read
+            # decimated (GDAL then uses the overviews) and blocks that
+            # would need more decimation than allowed are skipped (the
+            # caller falls back to the next, local, source).
+            limit_r = min(max_px, remote_max_rows) if self.remote else max_px
+            f = max(1, int(np.ceil(max(rows / limit_r, cols / max_px))))
+            if self.remote and f > remote_max_decimation:
+                log.info("remote block %dx%d too big for %s (x%d), skipped", rows, cols, self.info.id, f)
+                return []
+            out_shape = (len(self.bands), max(1, int(np.ceil(rows / f))), max(1, int(np.ceil(cols / f))))
+            try:
+                with self._env():
+                    raw = ds.read(self.bands[:1], window=Window(c0, r0, cols, rows), out_shape=out_shape,
+                                  resampling=Resampling.nearest)
+            except Exception as exc:
+                raise RasterUnavailableError(f"block read failed for {self.path}: {exc}") from exc
+            nodata = ds.nodata
+        data = raw[0].astype("float64")
+        if nodata is not None:
+            data[raw[0] == nodata] = np.nan
+        data = data * self.scale + self.offset
+        eff_dlat = rows * dlat / data.shape[0]
+        eff_dlon = cols * dlon / data.shape[1]
+        info = replace(self.info, resolution_m=self.info.resolution_m * eff_dlat / dlat) if f > 1 else self.info
+        return [RasterGrid(data=data, north=b.top - r0 * dlat, west=b.left + c0 * dlon,
+                           dlat=eff_dlat, dlon=eff_dlon, source=info)]
+
     def close(self) -> None:
         if self._ds is not None:
             self._ds.close()
@@ -130,6 +180,12 @@ class MultiFileRasterSource(RasterSource):
             if win is not None and not np.isnan(win.data).any():
                 return win
         return None
+
+    def read_grids(self, south, west, north, east, pad_px=2, max_px=2000, **kw):
+        out = []
+        for f in self.files:
+            out.extend(f.read_grids(south, west, north, east, pad_px, max_px, **kw))
+        return out
 
     def close(self):
         for f in self.files:
@@ -164,6 +220,20 @@ class LayeredRasterSource(RasterSource):
             if win is not None and np.all(np.isfinite(np.atleast_1d(win.center))):
                 return win
         return None
+
+    def read_grids(self, south, west, north, east, pad_px=2, max_px=2000, **kw):
+        """All sources' blocks, best priority first (callers take, per
+        sample, the first block with a value)."""
+        out = []
+        for i, src in enumerate(self.sources):
+            if self._down_until.get(i, 0) > time.monotonic():
+                continue
+            try:
+                out.extend(src.read_grids(south, west, north, east, pad_px, max_px, **kw))
+            except RasterUnavailableError as exc:
+                log.warning("raster source %s unavailable: %s", src.info.id, exc)
+                self._down_until[i] = time.monotonic() + self.cooldown_s
+        return out
 
     def close(self):
         for s in self.sources:
