@@ -14,10 +14,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, layers, map, tiles
+from app.api import features, health, layers, map, tiles
+from app.catalog.map_config import get_map_config
 from app.catalog.registry import get_registry
 from app.core.config import get_settings
 from app.providers.factory import build_tile_provider
+from app.repositories.features import GeoJsonDirFeatureRepository
 from app.services.tiles import TileService
 
 settings = get_settings()
@@ -32,6 +34,10 @@ async def lifespan(app: FastAPI):
     provider = build_tile_provider(settings)
     app.state.tile_provider = provider
     app.state.tile_service = TileService(get_registry(), provider)
+    # Named features (labels): static GeoJSON shipped with the repo.
+    app.state.feature_repository = GeoJsonDirFeatureRepository.from_dir(
+        settings.features_dir, get_map_config().radius_m
+    )
     yield
     await provider.close()
 
@@ -59,6 +65,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(layers.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
 app.include_router(map.router, prefix="/api")
+app.include_router(features.router, prefix="/api")
 
 
 @app.get("/", tags=["system"], summary="API index (what lives where)")
