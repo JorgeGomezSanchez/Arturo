@@ -35,8 +35,10 @@ function dotIcon(color, selected) {
  * Also hosts the "placing" tap handler: while placing, a tap anywhere on
  * the map calls onPlace({lat, lon, zoom}). A normal tap/click is used on
  * purpose (no right-click, no long-press), so it works on touch screens.
+ * `locked` makes markers non-interactive (e.g. while picking route ends,
+ * so the tap reaches the map and snaps to the POI).
  */
-export default function PoiLayer({ pois, rules, colors, selectedId, onSelect, placing, onPlace, draft }) {
+export default function PoiLayer({ pois, rules, colors, selectedId, onSelect, placing, locked = false, onPlace, draft }) {
   const map = useMap()
   const [zoom, setZoom] = useState(() => map.getZoom())
   const [centerLon, setCenterLon] = useState(() => map.getCenter().lng)
@@ -65,7 +67,7 @@ export default function PoiLayer({ pois, rules, colors, selectedId, onSelect, pl
             position={[lat, nearestLon(lon, centerLon)]}
             icon={mode === 'full' ? fullIcon(name, category, color, selected) : dotIcon(color, selected)}
             zIndexOffset={mode === 'full' ? 1000 : 500}
-            interactive={!placing}
+            interactive={!placing && !locked}
             eventHandlers={{ click: () => onSelect(poi) }}
             title={name}
           />

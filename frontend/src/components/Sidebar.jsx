@@ -6,12 +6,20 @@ import { useState } from 'react'
  * small screens.
  *
  * tabs = [{ id, label, badge?, content }]
+ * autoCollapse: when it turns true on a phone (e.g. a route is being
+ * drawn), the sidebar folds away so the map can be tapped.
  */
-export default function Sidebar({ header, tabs, activeTab, onTabChange }) {
+export default function Sidebar({ header, tabs, activeTab, onTabChange, autoCollapse = false }) {
   // Start collapsed on phones so the map is visible first.
   const [collapsed, setCollapsed] = useState(
     () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches,
   )
+  // Fold on the rising edge of autoCollapse (state adjusted during render).
+  const [prevAuto, setPrevAuto] = useState(autoCollapse)
+  if (autoCollapse !== prevAuto) {
+    setPrevAuto(autoCollapse)
+    if (autoCollapse && window.matchMedia?.('(max-width: 700px)').matches) setCollapsed(true)
+  }
   const current = tabs.find((t) => t.id === activeTab) ?? tabs[0]
   return (
     <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>

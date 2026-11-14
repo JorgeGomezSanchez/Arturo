@@ -1345,3 +1345,387 @@
   font-size: 11px;
   color: #8a837b;
 }
+
+/* ---------- Routes ---------- */
+.fab.fab-route {
+  bottom: 192px;
+  background: #2f6f8f;
+}
+.mars-map.route-mode .flabel,
+.mars-map.route-mode .poi-marker {
+  pointer-events: none;
+}
+
+/* Edit handles: big enough for a finger, distinct A / B */
+.route-handle {
+  background: none;
+  border: none;
+}
+.route-handle span {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font: 800 14px system-ui, sans-serif;
+  color: #fff;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+}
+.route-handle.end-a span {
+  background: #2f8f5b;
+}
+.route-handle.end-b span {
+  background: #b8452f;
+}
+.route-handle.wp span {
+  inset: 7px;
+  background: #f5efe6;
+  border-color: #0b0d12;
+}
+.route-handle.ghost span {
+  inset: 4px;
+  background: rgba(15, 17, 24, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  line-height: 1;
+}
+/* Wider invisible grab area around waypoints and ghosts */
+.route-handle.wp::before,
+.route-handle.ghost::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.leaflet-dragging .route-handle,
+.route-handle.leaflet-drag-target {
+  cursor: grabbing;
+}
+.route-handle {
+  cursor: grab;
+}
+
+.route-hazard-icon {
+  background: none;
+  border: none;
+}
+.route-hazard-icon span {
+  position: absolute;
+  inset: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transform: rotate(45deg);
+  font: 900 12px system-ui, sans-serif;
+  color: #1a1206;
+  border: 2px solid #0b0d12;
+}
+.route-hazard-icon b {
+  transform: rotate(-45deg);
+}
+.route-hazard-icon.warning span {
+  background: #f2b134;
+}
+.route-hazard-icon.danger span {
+  background: #ea4b3c;
+  color: #fff;
+}
+.route-hazard-icon.selected span {
+  outline: 3px solid #fff;
+}
+.route-hazard-glow {
+  animation: route-glow 1.2s ease-in-out infinite alternate;
+}
+@keyframes route-glow {
+  from {
+    stroke-opacity: 0.2;
+  }
+  to {
+    stroke-opacity: 0.7;
+  }
+}
+.route-wp-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Routes tab */
+.route-sev-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0 10px 0 4px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+}
+.poi-item.active {
+  outline: 2px solid #f0a070;
+}
+
+/* Route panel (shares .point-panel: side panel / bottom sheet) */
+.route-panel .sheet-grip-btn {
+  all: unset;
+  display: none;
+  cursor: pointer;
+}
+.route-title {
+  flex: 1;
+  min-width: 0;
+}
+.route-name {
+  width: 100%;
+  box-sizing: border-box;
+  font: 700 17px system-ui, sans-serif;
+  color: #e8e2da;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.route-ends {
+  margin-top: 6px;
+  line-height: 1.7;
+}
+.end-chip {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 10px;
+  color: #fff;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+}
+.end-chip.a {
+  background: #2f8f5b;
+}
+.end-chip.b {
+  background: #b8452f;
+}
+.route-summary {
+  position: relative;
+  padding: 0 14px 8px;
+}
+.route-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+.route-stats div {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.route-stats dt {
+  font-size: 11px;
+  color: #a8a097;
+}
+.route-stats dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+.route-busy {
+  position: absolute;
+  right: 14px;
+  top: -4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  background: rgba(15, 17, 24, 0.95);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.route-body {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.route-form label,
+.route-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.route-form select,
+.route-notes textarea {
+  font: inherit;
+  color: #e8e2da;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.route-form select option {
+  background: #1a1d26;
+}
+.route-actions {
+  display: flex;
+  gap: 8px;
+}
+.route-actions .btn {
+  flex: 1;
+}
+.route-hint {
+  margin: 10px 0 4px;
+}
+.route-notes {
+  margin: 12px 0 8px;
+}
+
+.route-profile {
+  margin: 0;
+}
+.route-profile svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+}
+.route-profile text {
+  font: 10px system-ui, sans-serif;
+  fill: #a8a097;
+}
+.route-profile .grid {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+.route-profile .wp {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-dasharray: 3 3;
+}
+.route-profile .area {
+  fill: rgba(200, 105, 60, 0.25);
+}
+.route-profile .line {
+  fill: none;
+  stroke: #f0a070;
+  stroke-width: 2;
+}
+.route-profile .zone {
+  opacity: 0.22;
+  cursor: pointer;
+}
+.route-profile .zone.info {
+  opacity: 0.1;
+}
+.route-profile .zone.selected {
+  opacity: 0.55;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+.route-profile .cursor {
+  fill: #ffd27a;
+  stroke: #0b0d12;
+  stroke-width: 1.5;
+}
+.route-profile figcaption {
+  font-size: 11px;
+  color: #8a837b;
+}
+
+.hazard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hazard-item {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 4px solid var(--sev, #777);
+}
+.hazard-item.warning {
+  --sev: #f2b134;
+}
+.hazard-item.danger {
+  --sev: #ea4b3c;
+}
+.hazard-item.info {
+  --sev: #6f8fa8;
+}
+.hazard-item.selected {
+  background: rgba(255, 255, 255, 0.12);
+  outline: 1px solid rgba(255, 255, 255, 0.35);
+}
+.hazard-item:focus-visible {
+  outline: 2px solid #f0a070;
+}
+.hazard-sev {
+  flex: none;
+  min-width: 58px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sev);
+  padding-top: 2px;
+}
+.hazard-item.info .hazard-sev {
+  color: #9ab3c8;
+}
+.hazard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hazard-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #d8d2ca;
+}
+
+@media (max-width: 700px) {
+  .route-panel {
+    height: 50%;
+  }
+  .route-panel.collapsed {
+    height: auto;
+  }
+  .route-panel .sheet-grip-btn {
+    display: block;
+    padding: 2px 0 4px;
+    width: 100%;
+  }
+  .route-stats dd {
+    font-size: 13px;
+  }
+}
+.hazard-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+.route-wp-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  font: 13px system-ui, sans-serif;
+}
