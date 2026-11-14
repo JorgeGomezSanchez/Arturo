@@ -10,6 +10,9 @@ Usage (from the ``backend/`` folder, with the venv active)::
     # Whole planet, Viking colour mosaic, levels 0-4 (~680 tiles, ~35 MB)
     python -m scripts.prefetch_tiles --layer viking_mdim21_color --max-level 4
 
+    # EVERY layer of the catalog, levels 0-3 (global offline overview)
+    python -m scripts.prefetch_tiles --layer all --max-level 3
+
     # Gale crater in CTX detail, levels 6-10
     python -m scripts.prefetch_tiles --layer ctx_global_5m \
         --min-level 6 --max-level 10 --bbox=-6.9,136.3,-3.9,139.3
@@ -55,7 +58,8 @@ def tiles_in(layer: LayerConfig, z: int, bbox: Optional[BBox]) -> Iterator[tuple
 async def main() -> int:
     settings = get_settings()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--layer", required=True, help="Layer id from layers.yaml")
+    parser.add_argument("--layer", required=True,
+                        help="Layer id from layers.yaml, comma separated ids, or 'all'")
     parser.add_argument("--min-level", type=int, default=None)
     parser.add_argument("--max-level", type=int, required=True)
     parser.add_argument("--bbox", default=None, help="south,west,north,east in degrees (use --bbox=... when it starts with a minus sign)")
@@ -63,13 +67,20 @@ async def main() -> int:
     parser.add_argument("--concurrency", type=int, default=8)
     args = parser.parse_args()
 
-    layer = get_registry().get(args.layer)
-    min_level = layer.levels.min if args.min_level is None else args.min_level
-    max_level = min(args.max_level, layer.levels.max)
+    registry = get_registry()
+    if args.layer == "all":
+        layers = registry.all()
+    else:
+        layers = [registry.get(i.strip()) for i in args.layer.split(",")]
     bbox: Optional[BBox] = tuple(map(float, args.bbox.split(","))) if args.bbox else None  # type: ignore
 
-    jobs = [(z, x, y) for z in range(min_level, max_level + 1) for x, y in tiles_in(layer, z, bbox)]
-    print(f"{layer.id}: {len(jobs)} tiles, levels {min_level}-{max_level} -> {args.out}")
+    jobs = []
+    for layer in layers:
+        min_level = layer.levels.min if args.min_level is None else max(args.min_level, layer.levels.min)
+        max_level = min(args.max_level, layer.levels.max)
+        layer_jobs = [(layer, z, x, y) for z in range(min_level, max_level + 1) for x, y in tiles_in(layer, z, bbox)]
+        print(f"{layer.id}: {len(layer_jobs)} tiles, levels {min_level}-{max_level} -> {args.out}")
+        jobs += layer_jobs
 
     provider = CachedTileProvider(
         RemoteTileProvider(settings.remote_timeout_s, settings.remote_user_agent), args.out
@@ -77,7 +88,7 @@ async def main() -> int:
     sem = asyncio.Semaphore(args.concurrency)
     stats = {"ok": 0, "missing": 0, "error": 0}
 
-    async def fetch(z: int, x: int, y: int) -> None:
+    async def fetch(layer: LayerConfig, z: int, x: int, y: int) -> None:
         async with sem:
             try:
                 await provider.get_tile(layer, z, x, y)
@@ -86,7 +97,7 @@ async def main() -> int:
                 stats["missing"] += 1
             except TileProviderError as exc:
                 stats["error"] += 1
-                print(f"  ! {z}/{x}/{y}: {exc}", file=sys.stderr)
+                print(f"  ! {layer.id} {z}/{x}/{y}: {exc}", file=sys.stderr)
         done = sum(stats.values())
         if done % 100 == 0 or done == len(jobs):
             print(f"  {done}/{len(jobs)} {stats}")
