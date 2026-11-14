@@ -106,3 +106,12 @@ export const updatePoi = (id, data) =>
 
 /** Delete a POI. */
 export const deletePoi = (id) => request('DELETE', `/api/pois/${encodeURIComponent(id)}`)
+
+/**
+ * Everything known about one location (GET /api/point): sections of
+ * items, each {id, label, value, unit, precision, noData, estimate,
+ * source, resolution, method, notes, series}. ls (0-360) is optional:
+ * default = today's season on Mars.
+ */
+export const getPoint = ({ lat, lon, ls }, signal) =>
+  getJson('/api/point', { query: { lat: lat.toFixed(5), lon: lon.toFixed(5), ls }, signal })
