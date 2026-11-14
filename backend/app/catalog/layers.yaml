@@ -122,3 +122,138 @@ layers:
       nodata_to_transparent: true
     source:
       url_template: "https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}"
+
+  # =====================================================================
+  #  OVERLAYS — thematic global layers from NASA Mars Trek
+  #  ---------------------------------------------------------------------
+  #  All verified against each product's WMTSCapabilities.xml
+  #  (https://trek.nasa.gov/tiles/Mars/EQ/{product}/1.0.0/WMTSCapabilities.xml):
+  #  same default028mm 2:1 equirectangular grid as the base layers, so
+  #  they align pixel-for-pixel. Stacking (z_index), bottom -> top:
+  #    10-19 topography colour   20-29 thermal   30-39 surface
+  #    40-49 composition         50-59 geology   60-69 shading
+  #    70-79 line/point overlays (hydrology)
+  # =====================================================================
+
+  # -------------------------------------------------------------------
+  # TOPOGRAPHY
+  # -------------------------------------------------------------------
+  - id: mola_hrsc_color_hillshade
+    name: "Elevation, colour (MOLA + HRSC, 200 m)"
+    description: >-
+      Colour-coded elevation with hillshading, from the blended MOLA
+      (Mars Global Surveyor) and HRSC (Mars Express) digital terrain model,
+      ~200 m/pixel. Colour = height, shading = relief.
+    group: overlay
+    category: topography
+    resolution_m: 200
+    format: jpg
+    tile_size: 256
+    levels: { min: 0, max: 8 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.85
+    z_index: 11
+    attribution: "MOLA/HRSC blend: NASA/JPL/GSFC/ESA/DLR/FU Berlin/USGS · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Elevation above the areoid"
+      units: "km"
+      quantitative: false
+      min_label: "Lowest (≈ −8 km, Hellas floor)"
+      max_label: "Highest (≈ +21 km, Olympus Mons)"
+      stops:
+        - { color: "#4b1b91" }
+        - { color: "#1b30a3" }
+        - { color: "#1b6ca4" }
+        - { color: "#1c9689" }
+        - { color: "#2da124" }
+        - { color: "#90b21d" }
+        - { color: "#b2782f" }
+        - { color: "#993b33" }
+        - { color: "#e8e8e8" }
+      notes:
+        - "Purple/blue = low basins and northern plains; green/yellow = mid elevations; red/brown = high plateaus; white = volcano summits."
+        - "Brightness also varies with the hillshade (sun-facing slopes look lighter)."
+        - "The published tiles do not document exact colour stops: the end values are the known extremes of Mars, not a calibrated scale. Exact heights will come from the DEM (point query, phase 2)."
+      sources:
+        - { name: "NASA Mars Trek product: MGS MOLA and Mars Express HRSC, Color Hillshade Blend", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Smith et al. (2001), MOLA summary, JGR 106(E10)", url: "https://doi.org/10.1029/2000JE001364" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
+
+  - id: mola_color_hillshade
+    name: "Elevation, colour (MOLA, 463 m)"
+    description: >-
+      The classic MOLA colour hillshade (Mars Global Surveyor laser
+      altimeter, 128 pixels/degree ≈ 463 m/pixel). Brighter palette than
+      the MOLA+HRSC blend; same meaning.
+    group: overlay
+    category: topography
+    resolution_m: 463
+    format: jpg
+    tile_size: 256
+    levels: { min: 0, max: 7 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.85
+    z_index: 10
+    attribution: "MOLA: NASA/JPL/GSFC · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Elevation above the areoid"
+      units: "km"
+      quantitative: false
+      min_label: "Lowest (≈ −8 km, Hellas floor)"
+      max_label: "Highest (≈ +21 km, Olympus Mons)"
+      stops:
+        - { color: "#5c39b1" }
+        - { color: "#3442c7" }
+        - { color: "#3996cf" }
+        - { color: "#41caba" }
+        - { color: "#51d34f" }
+        - { color: "#cded4a" }
+        - { color: "#e7a859" }
+        - { color: "#c35850" }
+        - { color: "#f2f2f2" }
+      notes:
+        - "Purple/blue = low, green/yellow = middle, red/brown = high, white = highest summits."
+        - "Qualitative ramp: exact colour stops are not published with the tiles."
+      sources:
+        - { name: "NASA Mars Trek product: MGS MOLA, Global Color Hillshade", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Smith et al. (2001), MOLA summary, JGR 106(E10)", url: "https://doi.org/10.1029/2000JE001364" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
+
+  - id: mola_hrsc_hillshade
+    name: "Shaded relief (MOLA + HRSC, 200 m)"
+    description: >-
+      Greyscale hillshade of the blended MOLA + HRSC terrain model. Drawn
+      in 'multiply' mode, so it adds relief shading to whatever layers are
+      underneath (imagery, thermal, geology...).
+    group: overlay
+    category: topography
+    resolution_m: 200
+    blend_mode: multiply
+    format: jpg
+    tile_size: 256
+    levels: { min: 0, max: 8 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.7
+    z_index: 60
+    attribution: "MOLA/HRSC blend: NASA/JPL/GSFC/ESA/DLR/FU Berlin/USGS · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Shaded relief (artificial illumination)"
+      quantitative: false
+      min_label: "Slope facing away from the light"
+      max_label: "Slope facing the light / flat"
+      stops:
+        - { color: "#3a3a3a" }
+        - { color: "#9a9a9a" }
+        - { color: "#f0f0f0" }
+      notes:
+        - "Shows the SHAPE of the terrain (relief), not its height or colour."
+        - "Combine it with any other layer: it only darkens, never hides."
+      sources:
+        - { name: "NASA Mars Trek product: MGS MOLA and Mars Express HRSC, Hillshade Blend", url: "https://trek.nasa.gov/mars/" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
