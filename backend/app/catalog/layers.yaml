@@ -257,3 +257,130 @@ layers:
         - { name: "NASA Mars Trek product: MGS MOLA and Mars Express HRSC, Hillshade Blend", url: "https://trek.nasa.gov/mars/" }
     source:
       url_template: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw/1.0.0/default/default028mm/{z}/{y}/{x}.jpg"
+
+  # -------------------------------------------------------------------
+  # THERMAL
+  # There is NO real-time temperature map of Mars. These layers are
+  # orbital thermal-infrared mosaics: they show RELATIVE surface
+  # temperature at the time of the observations (and, at night, the
+  # thermal inertia behind it). Estimated temperature for a given
+  # season/hour will come from the Mars Climate Model (phase 2).
+  # -------------------------------------------------------------------
+  - id: themis_day_ir
+    name: "Thermal IR, daytime (THEMIS, 100 m)"
+    description: >-
+      Daytime thermal-infrared mosaic from THEMIS (Mars Odyssey), controlled
+      to MDIM 2.1, ~100 m/pixel, between 65°S and 65°N. Brightness =
+      relative surface temperature in the afternoon; it mostly reveals
+      topography (sun-facing slopes are warmer).
+    group: overlay
+    category: thermal
+    resolution_m: 100
+    coverage: { south: -65, west: -180, north: 65, east: 180 }
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 9 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 1.0
+    z_index: 20
+    attribution: "THEMIS Day IR: NASA/JPL/ASU (Edwards et al. 2011; USGS 2018 controlled mosaic) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Relative daytime surface temperature"
+      quantitative: false
+      min_label: "Cooler (dark)"
+      max_label: "Warmer (bright)"
+      stops:
+        - { color: "#101010" }
+        - { color: "#808080" }
+        - { color: "#f5f5f5" }
+      notes:
+        - "Bright = warmer in the afternoon: mainly slopes facing the Sun and dark, low-albedo ground."
+        - "Dark = cooler: slopes facing away from the Sun, shadows, bright dusty ground."
+        - "Relative values only: the mosaic is contrast-stretched per image, it is NOT a temperature in kelvin."
+        - "No data poleward of ±65° latitude."
+      sources:
+        - { name: "NASA Mars Trek product: MO THEMIS-IR Day, Global Mosaic (2018 controlled release)", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Edwards et al. (2011), THEMIS global mosaics, JGR 116, E10008", url: "https://doi.org/10.1029/2010JE003755" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: themis_night_ir
+    name: "Thermal IR, night-time (THEMIS, 100 m)"
+    description: >-
+      Night-time thermal-infrared mosaic from THEMIS (Mars Odyssey),
+      ~100 m/pixel, 65°S-65°N. At night, warm = ground that stores heat
+      (rock, bedrock, cemented soil); cold = fine dust and sand. Has some
+      gaps (transparent).
+    group: overlay
+    category: thermal
+    resolution_m: 100
+    coverage: { south: -65, west: -180, north: 65, east: 180 }
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 9 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 1.0
+    z_index: 21
+    attribution: "THEMIS Night IR: NASA/JPL/ASU (Edwards et al. 2011; USGS 2018 controlled mosaic) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Relative night-time surface temperature"
+      quantitative: false
+      min_label: "Colder: dust, fine sand (low thermal inertia)"
+      max_label: "Warmer: rock, bedrock, crusts (high thermal inertia)"
+      stops:
+        - { color: "#101010" }
+        - { color: "#808080" }
+        - { color: "#f5f5f5" }
+      notes:
+        - "Bright = stays warm at night = high thermal inertia: rocky or bedrock surfaces (firmer footing)."
+        - "Dark = cools fast = low thermal inertia: loose dust or fine sand (possible soft ground)."
+        - "Relative values only, not kelvin. Transparent areas = no data; nothing poleward of ±65°."
+      sources:
+        - { name: "NASA Mars Trek product: MO THEMIS-IR Night, Global Mosaic (2018 controlled release)", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Edwards et al. (2011), THEMIS global mosaics, JGR 116, E10008", url: "https://doi.org/10.1029/2010JE003755" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_NightIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png"
+
+  - id: tes_thermal_inertia
+    name: "Thermal inertia (TES, ~3 km)"
+    description: >-
+      Global thermal inertia from the Thermal Emission Spectrometer
+      (Mars Global Surveyor), 20 pixels/degree (~3 km). How well the
+      ground stores heat: low = dust/fine sand, high = rock/bedrock/ice.
+    group: overlay
+    category: thermal
+    resolution_m: 3000
+    format: png
+    tile_size: 256
+    levels: { min: 0, max: 1 }
+    display: { min_zoom: 0, max_zoom: 18 }
+    opacity: 0.75
+    z_index: 22
+    attribution: "TES thermal inertia: NASA/JPL/ASU (Putzig et al. 2005) · via NASA Mars Trek"
+    legend:
+      type: gradient
+      title: "Thermal inertia"
+      units: "J m⁻² K⁻¹ s⁻½"
+      quantitative: false
+      min_label: "Low: dust, fine sand"
+      max_label: "High: rock, bedrock, cemented ground"
+      stops:
+        - { color: "#5000d1" }
+        - { color: "#2c49ed" }
+        - { color: "#28c8ff" }
+        - { color: "#00cc4f" }
+        - { color: "#9fef00" }
+        - { color: "#ffff00" }
+        - { color: "#ff8700" }
+        - { color: "#ff3127" }
+      notes:
+        - "Blue/purple = low (dust-mantled regions such as Tharsis, Arabia, Elysium); red = high."
+        - "The colour direction was checked against those known low-inertia regions; numeric stops are not published with the tiles (typical Mars range ≈ 20-800 units)."
+        - "Coarse: one value every ~3 km. Transparent = no data."
+      sources:
+        - { name: "NASA Mars Trek product: MGS TES, Global Thermal Inertia", url: "https://trek.nasa.gov/mars/" }
+        - { name: "Putzig et al. (2005), Icarus 173, 325-341", url: "https://doi.org/10.1016/j.icarus.2004.08.017" }
+    source:
+      url_template: "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia/1.0.0/default/default028mm/{z}/{y}/{x}.png"
