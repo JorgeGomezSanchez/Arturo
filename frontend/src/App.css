@@ -407,6 +407,135 @@
   mix-blend-mode: overlay;
 }
 
+/* ---------- Legend ---------- */
+.legend-panel {
+  top: 96px; /* below the zoom buttons */
+  right: 12px;
+  width: 300px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 200px);
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+}
+
+.panel-toggle {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 0.45rem;
+  font-weight: 600;
+}
+
+.legend-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 0.3rem 0.3rem;
+}
+
+.legend-card {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.4rem 0;
+}
+
+.legend-title {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-layer {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.legend-bar {
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.legend-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.legend-ends span:last-child {
+  text-align: right;
+}
+
+.legend-swatches {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.legend-swatches li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.legend-swatches .swatch {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.legend-swatches .swatch.line {
+  height: 3px;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.legend-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(216, 180, 106, 0.15);
+  color: #e2c27e;
+}
+
+.legend-notes {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #cfc7bd;
+}
+
+.legend-notes li {
+  margin: 2px 0;
+}
+
+.legend-sources {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #a8a097;
+}
+
+.legend-sources a {
+  color: #f0b48e;
+}
+
 /* ---------- Small screens: sidebar collapses, legend narrower ---------- */
 .sidebar.collapsed .tab-panel {
   width: auto;
@@ -419,5 +548,11 @@
   }
   .sidebar .header p {
     display: none;
+  }
+  .legend-panel {
+    top: auto;
+    bottom: 80px;
+    width: 260px;
+    max-height: 40%;
   }
 }

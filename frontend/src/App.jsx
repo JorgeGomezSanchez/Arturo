@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Header from './components/Header'
 import LayersPanel from './components/LayersPanel'
+import LegendPanel from './components/LegendPanel'
 import MarsMap from './components/MarsMap'
 import Sidebar from './components/Sidebar'
 import ZonesPanel from './components/ZonesPanel'
@@ -41,6 +42,7 @@ function MapApp({ data }) {
         activeTab={tab}
         onTabChange={setTab}
       />
+      <LegendPanel layers={data.layers} layerState={layerState} />
     </div>
   )
 }
