@@ -1,8 +1,11 @@
 import { useMemo } from 'react'
-import { MapContainer, ScaleControl, TileLayer } from 'react-leaflet'
+import { MapContainer, ScaleControl, TileLayer, ZoomControl } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiUrl } from '../api/client'
 import { createMarsCrs } from '../map/crs'
+import CoordinatesReadout from './CoordinatesReadout'
+import HashView from './HashView'
+import { parseHash } from '../map/hash'
 
 /**
  * Full-screen Mars map.
@@ -19,14 +22,19 @@ export default function MarsMap({ mapConfig, layers, children }) {
     [layers],
   )
 
-  const { center, zoom, minZoom, maxZoom, bounds } = mapConfig
+  const { minZoom, maxZoom, bounds } = mapConfig
+  // Initial view: the URL hash if present (#zoom/lat/lon), else the backend default.
+  const initial = useMemo(() => {
+    const fromHash = parseHash()
+    return fromHash ?? { zoom: mapConfig.zoom, lat: mapConfig.center.lat, lon: mapConfig.center.lon }
+  }, [mapConfig])
 
   return (
     <MapContainer
       className="mars-map"
       crs={crs}
-      center={[center.lat, center.lon]}
-      zoom={zoom}
+      center={[initial.lat, initial.lon]}
+      zoom={initial.zoom}
       minZoom={minZoom}
       maxZoom={maxZoom}
       // Clamp vertical panning to the poles; longitude wraps around freely
@@ -38,7 +46,10 @@ export default function MarsMap({ mapConfig, layers, children }) {
       maxBoundsViscosity={1.0}
       worldCopyJump
       zoomSnap={1}
+      zoomControl={false}
+      attributionControl
     >
+      <ZoomControl position="topright" />
       {baseLayers.map((layer) => (
         <TileLayer
           key={layer.id}
@@ -57,6 +68,8 @@ export default function MarsMap({ mapConfig, layers, children }) {
         />
       ))}
       <ScaleControl position="bottomleft" imperial={false} maxWidth={160} />
+      <CoordinatesReadout radiusM={mapConfig.radiusM} />
+      <HashView />
       {children}
     </MapContainer>
   )

@@ -1,3 +1,4 @@
+import Header from './components/Header'
 import MarsMap from './components/MarsMap'
 import { useBackendData } from './hooks/useBackendData'
 import './App.css'
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <div className="app">
       <MarsMap mapConfig={data.mapConfig} layers={data.layers} />
+      <Header health={data.health} />
     </div>
   )
 }
