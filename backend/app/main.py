@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, layers, tiles
+from app.api import health, layers, map, tiles
 from app.catalog.registry import get_registry
 from app.core.config import get_settings
 from app.providers.factory import build_tile_provider
@@ -58,3 +58,4 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(layers.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
+app.include_router(map.router, prefix="/api")

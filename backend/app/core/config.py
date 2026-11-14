@@ -36,6 +36,8 @@ class Settings(BaseSettings):
 
     # Layer catalog (which layers exist and where they come from)
     layers_file: Path = BACKEND_DIR / "app" / "catalog" / "layers.yaml"
+    # Map configuration (initial view, zoom limits) and detail zones
+    map_file: Path = BACKEND_DIR / "app" / "catalog" / "map.yaml"
 
     # ------------------------------------------------------------------
     # DATA SOURCE (the Earth <-> Mars switch)
@@ -61,7 +63,7 @@ class Settings(BaseSettings):
     # uses the Vite proxy, so this is usually not needed.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    @field_validator("layers_file", "local_tiles_dir", "tile_cache_dir")
+    @field_validator("layers_file", "map_file", "local_tiles_dir", "tile_cache_dir")
     @classmethod
     def _resolve_relative_to_backend(cls, value: Path) -> Path:
         """Relative paths are resolved against backend/, not the CWD."""

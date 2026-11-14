@@ -1,0 +1,73 @@
+# =====================================================================
+#  MAP CONFIGURATION AND DETAIL ZONES
+# =====================================================================
+#  Served by GET /api/map and GET /api/zones. The frontend reads its
+#  initial view, zoom limits and the side-menu zones from here, so none
+#  of it is hard-coded in the UI.
+#
+#  Coordinates: planetocentric latitude, longitude -180..180 (east
+#  positive), the convention used by NASA Mars Trek.
+# =====================================================================
+
+map:
+  body: Mars
+  # Mean radius of Mars (IAU 2000 sphere used by the tiles), in metres.
+  # The frontend uses it for the scale bar.
+  radius_m: 3396190
+  # Equirectangular "lat/lon" projection (Leaflet's L.CRS.EPSG4326).
+  crs: EPSG4326
+  center: { lat: 0, lon: 0 }
+  zoom: 2
+  min_zoom: 1
+  # CTX's native maximum is map zoom 13 (~5 m/px); beyond that the last
+  # tile is upscaled, which is still useful for a few levels.
+  max_zoom: 16
+  bounds: { south: -90, west: -180, north: 90, east: 180 }
+
+# ---------------------------------------------------------------------
+#  Detail zones (side menu). status:
+#    planned   -> listed, auto-zoom works, detailed data comes in later
+#                 phases (HiRISE, DTM, POIs, routes...)
+#    available -> detailed data is loaded
+#  Bounds are approximate and meant for framing the view.
+# ---------------------------------------------------------------------
+zones:
+  - id: gale
+    name: "Gale Crater"
+    description: >-
+      Curiosity rover landing site (2012). Only place on Mars with in-situ
+      surface radiation measurements (MSL/RAD).
+    status: planned
+    center: { lat: -5.4, lon: 137.8 }
+    bounds: { south: -6.9, west: 136.3, north: -3.9, east: 139.3 }
+    tags: [rover, radiation, curiosity]
+
+  - id: jezero
+    name: "Jezero Crater"
+    description: >-
+      Perseverance rover landing site (2021). Ancient lake delta with
+      excellent orbital mapping.
+    status: planned
+    center: { lat: 18.4, lon: 77.6 }
+    bounds: { south: 17.9, west: 77.0, north: 18.9, east: 78.2 }
+    tags: [rover, delta, perseverance]
+
+  - id: arcadia
+    name: "Arcadia Planitia"
+    description: >-
+      Mid-latitude northern plain with shallow subsurface water ice;
+      one of the most cited candidate regions for crewed landings.
+    status: planned
+    center: { lat: 40.0, lon: -170.0 }
+    bounds: { south: 35.0, west: -178.0, north: 45.0, east: -162.0 }
+    tags: [human-landing, water-ice]
+
+  - id: deuteronilus
+    name: "Deuteronilus Mensae"
+    description: >-
+      Mesas and glacier-like flows with buried ice; a candidate region
+      for human exploration zones.
+    status: planned
+    center: { lat: 44.0, lon: 22.0 }
+    bounds: { south: 40.0, west: 16.0, north: 48.0, east: 28.0 }
+    tags: [human-landing, water-ice, glaciers]
