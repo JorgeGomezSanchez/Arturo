@@ -264,8 +264,10 @@ class RouteAnalyzer:
                 if colour:
                     for ii in range(i0, i1 + 1):
                         level[ii] = max(level[ii], sev_fn(values[ii]) if np.isfinite(values[ii]) else sev_idx)
+                # threshold: one value, or {severity index: value} to report the limit that was crossed
+                thr = threshold.get(sev_idx) if isinstance(threshold, dict) else threshold
                 hazards.append(self._hazard(samples, htype, len(hazards), LEVELS[sev_idx], title_fn(v, sev_idx),
-                                            desc_fn(v, sev_idx, i0, i1), v, unit, threshold, i0, i1, j, scope))
+                                            desc_fn(v, sev_idx, i0, i1), v, unit, thr, i0, i1, j, scope))
 
         def tier(v, warn=None, danger=None, info=None, below=False):
             if not np.isfinite(v):
@@ -286,7 +288,7 @@ class RouteAnalyzer:
             lambda v, t, i0, i1: (f"Terrain slope up to {v:.0f}° ({mode.label}: difficult from {sd:g}°, "
                                   f"impassable from {si:g}°). Measured over a {res_txt(i0, i1)} baseline: "
                                   "local slopes can be steeper."),
-            "°", sd)
+            "°", {2: sd, 3: si})
 
         gi_, gw_ = H["grade_deg"]["info"], H["grade_deg"]["warning"]
         agr = np.abs(grade)
@@ -295,7 +297,7 @@ class RouteAnalyzer:
             lambda v, t, i0, i1: (f"Along the route the ground rises or falls up to {v:.0f}° "
                                   f"({'climb' if np.nanmax(grade[i0:i1 + 1]) >= -np.nanmin(grade[i0:i1 + 1]) else 'descent'}): "
                                   "slower and more tiring; braking matters on descents."),
-            "°", gi_)
+            "°", {1: gi_, 2: gw_})
 
         # Roughness thresholds scale with the window size (see routes.yaml).
         rcfg = H["roughness_m"]
@@ -308,7 +310,7 @@ class RouteAnalyzer:
             lambda v, t, i0, i1: (f"Height variations of {v:.0f} m RMS around the local trend, scaled to a 1 km "
                                   f"window (measured over {fmt_km(5 * float(np.nanmax(res_m[i0:i1 + 1])))}): "
                                   "ridges, gullies or blocky ground."),
-            "m", rw)
+            "m", {2: rw, 3: rd})
 
         tiw = H["soft_ground_ti"]["warning"]
         soft_sev = 2 if req.mode == "rover" else 1
@@ -330,14 +332,14 @@ class RouteAnalyzer:
             lambda v, t: "Extreme night cold",
             lambda v, t, i0, i1: (f"Nights reach about {v:.0f} °C here at Ls {ls:.0f}° (thermal-model estimate). "
                                   "Do not get stranded overnight; plan shelter and power for heating."),
-            "°C", tw, worst="min")
+            "°C", {2: tw, 3: tdg}, worst="min")
 
         pi_, pw = H["low_pressure_pa"]["info"], H["low_pressure_pa"]["warning"]
         add("low_pressure", np.nan_to_num(pressure, nan=1e9) < pi_, pressure, lambda v: tier(v, pw, None, pi_, below=True),
             lambda v, t: "High altitude, very thin air",
             lambda v, t, i0, i1: (f"Estimated pressure {v:.0f} Pa: less atmosphere above you means more radiation, "
                                   "and vehicles that need aerobraking or parachutes cannot land here."),
-            "Pa", pi_, worst="min")
+            "Pa", {1: pi_, 2: pw}, worst="min")
 
         drw = H["dose_rate_msv_day"]["warning"]
         add("radiation_rate", np.nan_to_num(dose_rate) >= drw, dose_rate, lambda v: tier(v, drw),

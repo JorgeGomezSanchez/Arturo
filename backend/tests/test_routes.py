@@ -218,3 +218,11 @@ def test_routes_crud_contract(route_env):
     assert route_env.delete(f"/api/routes/{rid}").status_code == 404
     bad = dict(body, name="  ")
     assert route_env.post("/api/routes", json=bad).status_code == 422
+
+
+def test_hazard_reports_the_threshold_it_crossed(route_env):
+    a = analyze(route_env, [[START, 0.0], [END, 0.0]])
+    slope = next(h for h in a["hazards"] if h["type"] == "slope")
+    assert slope["severity"] == "danger" and slope["threshold"] == 25  # impassable limit, not the difficult one
+    grade = next(h for h in a["hazards"] if h["type"] == "grade")
+    assert grade["severity"] == "warning" and grade["threshold"] == 15
