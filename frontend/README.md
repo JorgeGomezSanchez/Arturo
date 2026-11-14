@@ -73,7 +73,7 @@ After that it calls, as needed:
 Then, for each layer, it creates a Leaflet `TileLayer` with the
 options **exactly as the backend sends them** (`tileUrl`, `tileSize`,
 `zoomOffset`, `minNativeZoom`, `maxNativeZoom`, `minZoom`, `maxZoom`,
-`opacity`, `zIndex`, `attribution`). Tiles are requested to
+`opacity`, `zIndex`). Tiles are requested to
 `/api/tiles/{layer}/{z}/{x}/{y}` on our backend.
 
 Consequences:
@@ -198,6 +198,25 @@ edit`) in `App.jsx`. All POI calls go through `hooks/usePois.js` →
 collapsed and leaves room for the zoom buttons, and the legend panel
 moves to the bottom of the screen.
 
+The page itself never scrolls: `.app` is `position: fixed; inset: 0`
+with `overflow: clip`, and `html`/`body` have `overflow: hidden`. Panels
+scroll inside themselves (`.tab-content`, legend, credits). If you add an
+absolutely positioned element inside a panel, keep a positioned ancestor
+inside the scrolling element (as `.layer-toggle` does for its hidden
+checkbox). Otherwise it escapes the panel's scroll area and can bring
+back a page scrollbar, and the page jumps when it receives focus.
+
+**Credits** (`components/CreditsControl.jsx`): Leaflet's attribution bar
+is turned off because, with several layers on, it wrapped over the scale
+bar. Instead, a small **ⓘ Credits** pill sits in the bottom-right corner
+(the scale bar has the bottom-left corner to itself). It opens a panel
+that lists the credits of the layers switched on *and drawn at the current
+zoom*, the credit lines of the label groups that are on (`/api/map` →
+`labelCredits`) and Leaflet. Close it with ✕, the pill or `Esc`. The
+bottom-right stack, from the bottom up, is: Credits (12 px), coordinates
+readout (56 px), **＋ POI** (124 px). The legend panel always ends above
+it.
+
 ---
 
 ## 4. Features
@@ -221,7 +240,8 @@ Phase 1:
 - "Detail zones" side menu: click a zone to fly to it. Phase 1 zones
   are a stub ("Detail data coming soon").
 - Earth/Mars mode badge.
-- Data attributions (NASA/JPL/USGS, MSSS, Caltech Murray Lab, Esri).
+- Data credits (NASA/JPL/USGS, MSSS, Caltech Murray Lab, Esri…) in the
+  **ⓘ Credits** panel (see *Layout*).
 
 ---
 

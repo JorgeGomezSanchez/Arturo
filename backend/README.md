@@ -403,6 +403,10 @@ Viking fills them.
 - `poi_visibility`: the zoom rules for POIs (`label_zoom_margin`,
   `marker_zoom_margin`, `world_zoom`). Sent in `/api/map` as
   `poiVisibility`. See [§10](#10-points-of-interest-apipois).
+- `label_credits`: one credit line per label group (`names`,
+  `landing_site`, `exploration_zone`). Sent in `/api/map` as
+  `labelCredits`; the frontend's Credits panel shows a line while that
+  group of labels is on.
 
 Coordinates: planetocentric latitude, longitude −180…180 east-positive
 (Mars Trek convention).

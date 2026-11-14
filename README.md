@@ -406,8 +406,11 @@ lives in `backend/app/catalog/layers.yaml` and is shown in each layer's
 legend. Planned for later phases: HiRISE images and DTMs (MRO), MSL/RAD
 radiation measurements (Curiosity), NASA Ames Mars climate model.
 
-Attributions are shown in the map's bottom-right corner and are defined
-per layer in `layers.yaml`.
+Credits are one tap away behind the **ⓘ Credits** button in the map's
+bottom-right corner. The panel lists only what is on screen: the tile
+layers that are switched on and drawn at the current zoom (credit text
+per layer in `layers.yaml`), the label groups that are on (credit text in
+`map.yaml` → `label_credits`) and Leaflet.
 
 ---
 
