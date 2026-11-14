@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Backend root folder (…/backend)
@@ -35,9 +37,35 @@ class Settings(BaseSettings):
     # Layer catalog (which layers exist and where they come from)
     layers_file: Path = BACKEND_DIR / "app" / "catalog" / "layers.yaml"
 
+    # ------------------------------------------------------------------
+    # DATA SOURCE (the Earth <-> Mars switch)
+    #   remote -> Earth mode: tiles come from NASA Mars Trek / Esri over
+    #             the Internet (and are stored in the disk cache).
+    #   local  -> Mars mode: tiles are read ONLY from LOCAL_TILES_DIR,
+    #             no network at all.
+    # ------------------------------------------------------------------
+    data_source: Literal["remote", "local"] = "remote"
+
+    # Folder with offline tile packs: {dir}/{layer}/{z}/{x}/{y}.{ext}
+    local_tiles_dir: Path = BACKEND_DIR / "data" / "tiles"
+
+    # Disk cache for remote mode (same layout as LOCAL_TILES_DIR)
+    tile_cache_enabled: bool = True
+    tile_cache_dir: Path = BACKEND_DIR / "cache" / "tiles"
+
+    # HTTP client for remote mode
+    remote_timeout_s: float = 15.0
+    remote_user_agent: str = "Arturo/0.1 (NASA Space Apps 2026 project)"
+
     # Allowed CORS origins (comma separated). In development the frontend
     # uses the Vite proxy, so this is usually not needed.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @field_validator("layers_file", "local_tiles_dir", "tile_cache_dir")
+    @classmethod
+    def _resolve_relative_to_backend(cls, value: Path) -> Path:
+        """Relative paths are resolved against backend/, not the CWD."""
+        return value if value.is_absolute() else (BACKEND_DIR / value).resolve()
 
     @property
     def cors_origin_list(self) -> list[str]:
