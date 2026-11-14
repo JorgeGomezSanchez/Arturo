@@ -5,3 +5,13 @@ body,
   height: 100%;
   margin: 0;
 }
+
+/* The app is a fixed, full-viewport map: the document itself must never
+   scroll. Without this, any floating panel that grows past the bottom of
+   the screen adds a page scrollbar, and wheel or focus events then scroll
+   the whole page instead of the panel. */
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}

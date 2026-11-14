@@ -1,6 +1,11 @@
 .app {
-  position: relative;
-  height: 100%;
+  /* Pinned to the viewport (follows mobile browser bars, unlike 100vh).
+     overflow: clip also blocks programmatic scrolling (focus(),
+     scrollIntoView), which overflow: hidden alone does not. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overflow: clip;
 }
 
 .mars-map {
