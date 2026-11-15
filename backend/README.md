@@ -139,7 +139,7 @@ in the habitat, and updates arrive as packs from time to time.
 |---|---|---|
 | `DATA_SOURCE` | `remote` | `local` |
 | Tiles come from | NASA Mars Trek WMTS / Esri, over the Internet | `LOCAL_TILES_DIR` on disk (later: local DB, Martian network…) |
-| Disk cache | Yes: every visited tile is stored in `cache/tiles` | Not needed |
+| Disk cache | Yes: complete, decodable tiles are stored in `cache/tiles` (truncated/corrupt ones are not) | Not needed |
 | Frontend changes | — | **None** |
 | Backend code changes | — | **None** (only the env var) |
 | Labels | Local GeoJSON in `data/features` | Same files (always offline) |
@@ -303,24 +303,34 @@ GET /api/tiles/ctx_global_5m/9/902/269
   └─ api/tiles.py            (HTTP: parse params, map errors to 404/502)
      └─ TileService          (layer exists? tile inside the grid?)
         └─ TileProvider      (chosen by DATA_SOURCE at startup)
-           ├─ CachedTileProvider → on disk? return it : ask inner + save
+           ├─ CachedTileProvider → on disk and well-formed? return it
+           │                       else evict a truncated file, ask inner,
+           │                       save only if the image is complete
            │    └─ RemoteTileProvider → GET astro.arcgis.com/.../9/269/902
-           │         (retries transient 5xx / timeouts)
+           │         (retries transient 5xx / timeouts / short bodies)
            └─ LocalTileProvider  → read data/tiles/ctx_global_5m/9/902/269.png
         └─ repair            (truncated/missing tile: fill from parent)
         └─ transforms        (CTX: black no-data pixels → transparent)
 ```
 
 The Esri OnMars/CTX service (the high-resolution base imagery) sometimes
-returns HTTP 200 with a truncated or corrupt PNG, or a persistent HTTP
-500, for a handful of tiles. Those used to surface as 404s and 502s and
-left a hole filled only by the low-resolution Viking mosaic. The tile
-service now retries the upstream request and, if the tile is still
-missing or only partially decodable, upscales the nearest complete
-ancestor (parent / grandparent / …) and composites any recovered native
-rows on top. The cache stores the original upstream bytes, so a later
-fixed tile is picked up on a cache miss / eviction; the repaired image
-is built per request.
+returns HTTP 200 with a truncated or corrupt PNG (``Content-Length``
+matches the body: the file on their side is already incomplete), or a
+persistent HTTP 500, for a handful of tiles — including some around
+Gale crater, not only near the poles. Those used to surface as 404s and
+502s and left a hole filled only by the low-resolution Viking mosaic.
+The tile service now retries the upstream request and, if the tile is
+still missing or only partially decodable, upscales the nearest complete
+ancestor (parent / grandparent / …, fetched from upstream if it is not
+already local) and composites any recovered native rows on top.
+
+The disk cache only stores well-formed, strictly decodable images.
+Writes are atomic (temp file + ``fsync`` + ``os.replace``), and a body
+shorter than its ``Content-Length`` is retried, then discarded. A
+truncated file already on disk (an older cache, or an upstream PNG we
+used to store as-is) is evicted and refetched on the next request; you
+do not need to delete ``backend/cache/`` by hand. The repaired image
+is built per request so a later-fixed upstream tile can be picked up.
 
 ### The provider interface
 
@@ -1125,7 +1135,7 @@ same.
 | Tiles return 502 | No Internet or NASA/Esri is down. Already visited tiles still work from the cache; or switch to `DATA_SOURCE=local`. |
 | Tiles return 404 | Normal outside a source's coverage/levels (e.g. CTX near the poles); the Viking base shows underneath. In local mode: the tile is not in the pack. |
 | Port 8000 busy | `uvicorn app.main:app --port 8001` and set `VITE_DEV_BACKEND=http://127.0.0.1:8001` in the frontend. |
-| Want to clear the cache | Delete `backend/cache/`. |
+| Want to clear the cache | Delete `backend/cache/`. Not needed for truncated CTX tiles: they are evicted and refetched on the next request. |
 | `http://localhost:8000/` used to give 404 | Fixed: it now returns an index. Use `/docs` to explore the API. |
 | `source .venv/bin/activate` fails in fish | Use `source .venv/bin/activate.fish`. |
 | No labels on the map | Check `GET /api/features/categories`. If counts are 0, `FEATURES_DIR` points to the wrong folder. |
@@ -1141,4 +1151,4 @@ same.
 | Auto route: "No passable path… touches the edge of the search area" | Press *Search a larger area* (or send `weights.marginFraction` > 0.3). |
 | Auto route looks almost straight | The straight line is already near the cheapest path for the configured weights; raise `difficult_multiplier` to prefer gentler detours. |
 | Routes vanish on restart | `ROUTE_STORE=memory` is set; use `json`. |
-| A few CTX tiles near 80–88° N/S return 404 | Upstream sends some of them truncated; the backend treats them as no data so the Viking layer shows through. |
+| A few CTX tiles (Gale, high zoom, poles) used to 404 from cache | Upstream often serves a truncated PNG (not a half-written cache file). The backend evicts the bad cache entry, refetches, and fills missing rows from the parent tile. Restart the backend after `git pull`; no need to clear the cache. |
