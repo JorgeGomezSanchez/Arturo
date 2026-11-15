@@ -32,6 +32,12 @@ water and shelter) that **works without a connection to Earth**.
 | **Tap a hazard: the map flies to it and highlights it** | **Phone: bottom sheet, touch-dragged waypoint** |
 | ![Hazard selected](docs/img/phase3-hazard-selected.jpg) | ![Mobile route sheet](docs/img/phase3-mobile-sheet.jpg) |
 
+| Phase 4: straight line from Curiosity up Mount Sharp, 23.4° max slope | **✦ Auto: avoid hazards** — least-cost route via Gediz Vallis, 14.4° max |
+|---|---|
+| ![Straight up Mount Sharp](docs/img/phase4-sharp-straight.jpg) | ![Auto route up Mount Sharp](docs/img/phase4-sharp-auto.jpg) |
+| **Auto route to the foothills, compared with the straight line** | **Clear refusal when B is on a 30° slope** |
+| ![Auto route to the foothills](docs/img/phase4-auto-foothills.jpg) | ![Blocked end](docs/img/phase4-blocked-error.jpg) |
+
 ---
 
 ## Table of contents
@@ -168,6 +174,47 @@ routes, MOLA ~3.7 km elsewhere); the panel always says which data and
 resolution were used. Routing is **manual** for now: you move the line,
 the app tells you what is dangerous. Automatic suggestions come later.
 
+**Phase 4 — done ✅**: **automatic hazard-avoiding routes.** In the
+route panel, **✦ Auto: avoid hazards** asks the backend for the
+least-cost path from A to B and replaces the waypoints with it. They are
+ordinary waypoints, so the route stays editable (drag, remove, save), and
+*Undo* restores the previous ones.
+
+- The backend builds a **time-based cost grid** around A and B (a margin
+  of 30 % of the route's size) from the best elevation data available
+  (the same `RasterSource` stack: 200 m crops, the live 200 m DEM in
+  Earth mode, MOLA). Each cell costs the time to cross it: Tobler's hiking
+  function of the terrain slope on foot, the rover's linear slowdown by
+  rover, ×3 above the *difficult* slope (15°), ×1.5/×4 on rough ground.
+  Cells above the *impassable* slope (25°), a one-pixel clearance around
+  them and cells without data are excluded.
+- **scikit-image** (`MCP_Geometric`, Dijkstra on the 8-connected grid)
+  finds the cheapest path. It sits behind a small `GridPlanner` interface
+  so a custom A* can replace it later.
+- The pixel path becomes a handful of waypoints (line-of-sight shortcuts
+  that never cross an excluded cell and cost at most 5 % more), then goes
+  through the normal route analysis, so hazards, profile and colours are
+  the same as for a hand-drawn route.
+- The panel compares the result with the straight line and says which
+  data, resolution and grid were used. When no route exists it explains
+  why (e.g. *B is on terrain too steep*, or *B is cut off by slopes ≥ 25°*,
+  with a *Search a larger area* button), and it refuses routes crossing
+  180° E/W, beyond ±80° latitude or longer than 600 km.
+- All weights live in `backend/app/catalog/routes.yaml` → `planning`, and
+  every request can override them (`weights`).
+
+Demo (Curiosity landing site → Mount Sharp foothills, on foot):
+
+| Route | Distance | Warnings | Max slope |
+|---|---|---|---|
+| Straight line | 12.7 km | 6 | 17.1° |
+| Manual reroute (Phase 3) | 14.5 km | 4 (+2 info) | 15.5° |
+| **Auto** | **12.8 km** | **4 (+1 info)** | **15.5°** |
+
+Further up Mount Sharp (4.95° S 137.55° E) the auto route detours via
+Gediz Vallis: 25.0 km instead of 22.3 km, with a 14.4° max slope instead
+of 23.4°.
+
 See the [roadmap](#10-roadmap) for what comes next.
 
 ---
@@ -178,7 +225,8 @@ Monorepo with two top-level folders:
 
 - **`frontend/`** — React + Vite + Leaflet (react-leaflet). 2D only.
 - **`backend/`** — Python + FastAPI, rasterio + numpy for the numeric
-  GeoTIFF point queries. Later: scikit-image for routing.
+  GeoTIFF point queries and route analysis; scikit-image + SciPy for
+  automatic route planning.
 
 The **golden rule**: *the frontend only talks to our backend*. The backend
 is a black box that decides where the data comes from.
@@ -300,7 +348,8 @@ Arturo/
 │   │   ├── repositories/     feature (labels), POI and route storage abstractions
 │   │   └── services/         TileService, transforms, label ranking, point service,
 │   │                         terrain, thermal model, environment, Mars time,
-│   │                         geodesy (great circles), route_analysis (hazards)
+│   │                         geodesy (great circles), route_analysis (hazards),
+│   │                         route_planner (least-cost path)
 │   ├── scripts/              prefetch_tiles.py (offline packs), build_features.py (labels),
 │   │                         build_rasters.py (numeric GeoTIFFs)
 │   ├── data/features/        label GeoJSON (IAU names, landing sites, EZs) — in git
@@ -317,7 +366,7 @@ Arturo/
     └── src/
         ├── api/client.js     backend client (only place with the API URL)
         ├── hooks/            useBackendData, useLayerState, useLabelState, usePois,
-        │                     useRoutes, useRouteAnalysis
+        │                     useRoutes, useRouteAnalysis, useRoutePlan
         ├── map/              Mars CRS, URL hash, label declutter, POI icons and zoom rules,
         │                     route helpers (snapping, colours)
         └── components/       MarsMap, Sidebar (Layers / POIs / Routes / Zones), LayersPanel,
@@ -410,15 +459,20 @@ Tips:
 - Add a POI: tap **＋ POI** (bottom right), tap the map, fill the form.
   Press `Esc` or *Cancel* to stop placing.
 - Draw a route: tap **↝ Route**, tap A, tap B. Drag the line to deviate
-  it, then *Save route*. Saved routes are in the **Routes** tab.
+  it, or tap **✦ Auto: avoid hazards** in the route panel, then *Save
+  route*. Saved routes are in the **Routes** tab.
 
 ### 3. Tests (optional)
 
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-python -m pytest -q
+python -m pytest -q   # 60 tests, offline
 ```
+
+Updating an existing checkout? Run `pip install -r requirements.txt`
+again after `git pull`: Phase 4 added **scikit-image** and **SciPy**
+(binary wheels, nothing to compile).
 
 ---
 
@@ -482,6 +536,7 @@ Interactive docs at http://localhost:8000/docs.
 | GET / PUT / DELETE | `/api/routes/{id}` | Read, update (re-analysed) or delete one route | 3 ✅ |
 | GET | `/api/routes/{id}/analysis[?ls=]` | Full analysis of a saved route | 3 ✅ |
 | POST | `/api/routes/analyze` | Analyse a line without saving: profile, hazards, coloured segments, distance, time, dose | 3 ✅ |
+| POST | `/api/routes/plan` | Plan a hazard-avoiding route `{start, end, mode, weights?}` → waypoints + analysis + straight-line summary + how it was computed; `422 {reason, message, …}` when impossible | 4 ✅ |
 | GET | `/api/routes/config` | Travel modes and hazard thresholds (`routes.yaml`) | 3 ✅ |
 
 ---
@@ -531,7 +586,8 @@ per layer in `layers.yaml`), the label groups that are on (credit text in
 | **1b ✅** | Layers, labels, POIs | 16 toggleable layers with legends; IAU / landing-site / exploration-zone labels with decluttering (`/api/features`); manual POIs with CRUD (`/api/pois`); layer panel with opacity and order. |
 | **2 ✅** | Point query | Tap anywhere (or POI ⓘ Info) → location, terrain, thermal & climate, composition, geology, radiation & safety. Backend reads numeric GeoTIFFs with rasterio behind a `RasterSource` abstraction (200 m DEM crops / live USGS DEM / MOLA, TES, DCI, SIM 3292) plus small physical models → `GET /api/point`. |
 | **3 ✅** | Manual routes with hazards | A → B between POIs, labels or any point; great-circle line analysed against the DEM and the Phase 2 rasters/models (slope, grade, roughness, soft ground, dust, cold, pressure, radiation, crater rims, no data); severity-coloured line, profile and hazard list; Google-Maps-like touch editing; CRUD (`/api/routes`). |
-| **4** | Route suggestions | Cost surface from the same hazards, A* / least-cost path between A and B (and "avoid this hazard" from the list), time windows by season and local time. |
+| **4 ✅** | Automatic routes | Time-based cost grid from the DEM (Tobler / rover slowdown, difficult-slope and roughness penalties, impassable slope and no-data excluded) → scikit-image least-cost path behind a swappable `GridPlanner` → simplified into waypoints → normal analysis (`POST /api/routes/plan`); "Auto" button with Undo. |
+| **5** | Astronaut HUD preview *(planned, not implemented)* | A window that previews what an astronaut would see on the helmet HUD while following a route: current position, deviation from the planned route (cross-track distance and direction back to it), distance and ETA to the destination (and to the next waypoint), and only a few more strictly relevant items: the next hazard ahead (type, severity, distance), radiation dose accumulated so far, time left within the excursion limit. The estimated surface temperature is deliberately left out: the suit carries its own thermometer, and a modelled value would only add noise. Simulated by "walking" along a saved route; later fed by real positioning. |
 | **Extras** | Survival guide | Detail-zone packs (HiRISE) downloadable from the side menu; time/season-aware temperature and radiation warnings; offline pack manager; Service Worker for a fully offline frontend; printable traverse plan. |
 
 ---
@@ -600,6 +656,8 @@ Example: a MOLA hillshade from Mars Trek.
 | **Labels pre-built as GeoJSON, served by the backend** | Query the USGS Gazetteer live; label tiles | Works offline on Mars, files are small (~0.7 MB), and the backend can rank and filter by bbox/zoom. The frontend still decides the final on-screen layout because only it knows text sizes. |
 | **Declutter in the browser (greedy, by priority)** | Server-side placement; Leaflet plugins | Collision depends on the font, the screen and the current view. A greedy pass in priority order with a grid index handles ~600 candidates in a few ms. |
 | **POI visibility from `createdZoom`** | A manual "global/local" flag | It needs no extra choice from the user: what you mark while looking at the whole planet stays visible at that scale; what you mark at a single rock only appears near that zoom. |
+| **scikit-image `MCP_Geometric` first** | A hand-written A* | Fast (a 170×100 grid in a few ms), tested, and grid-native; behind a `GridPlanner` interface so an A* with direction-aware costs (uphill vs downhill) can replace it without touching the API or the frontend. |
+| **Auto route = ordinary waypoints** | A separate "planned route" type | No data-model change: the planned route is analysed, saved, edited and dragged exactly like a hand-drawn one, and the astronaut can always override the computer. |
 | **Manual routes first** | Automatic A* right away | The astronaut keeps control and sees *why* a line is dangerous; the analyser written for it is exactly the cost function a later pathfinder needs. |
 | **Thresholds only in `routes.yaml`** | Constants in code or in the frontend | Mission planners can tune them (and see their sources) without touching code; the frontend reads them from `/api/routes/config` and only knows colours. |
 | **Sampling at the DEM's resolution** | Fixed step | Sampling a 3.7 km MOLA pixel every 50 m adds no information; sampling 200 m data every 2 km misses slopes. The spacing follows the best data on the way (≥ 50 m, ≤ 2,500 samples). |
@@ -647,8 +705,17 @@ Example: a MOLA hillshade from Mars Trek.
   values (its mosaics are stretched images).
 - **"Inside" / "region"** use the IAU centre and diameter as a circle;
   real outlines are not circles.
-- **Routes are analysed, not planned**: the app does not search for a
-  safer path yet; you deviate the line yourself.
+- **Automatic planning is a grid search**: the cost is isotropic
+  (the terrain slope is treated as uphill in every direction, so descents
+  are not cheaper), east–west distances use the cosine of the search
+  area's middle latitude, only slope, roughness and no-data enter the
+  cost (cold, dust, radiation and crater rims are reported by the
+  analysis but not avoided), and the result is only as good as the DEM:
+  on MOLA (~3.7 km) a "passable" grid can still hide cliffs. Planning is
+  refused across 180° E/W, beyond ±80° latitude and above 600 km; big
+  areas are coarsened (the response says so). A planned route can still
+  carry warnings: when A or B themselves sit on steep ground, or the
+  safest path is still long.
 - **Route resolution**: 200 m elevation only inside the Gale/Jezero
   crops, or live in Earth mode for routes small enough (≤ ~80 DEM rows,
   roughly ≤ 30 km north–south; bigger blocks would take tens of seconds

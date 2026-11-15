@@ -71,6 +71,7 @@ After that it calls, as needed:
 | `POST` / `PUT` / `DELETE /api/pois…` | When you create, edit or delete a POI. |
 | `GET /api/routes`, `GET /api/routes/config` | Once at startup (saved routes, travel modes). |
 | `POST /api/routes/analyze` | After every route edit (debounced 300 ms, previous request aborted). |
+| `POST /api/routes/plan` | When you press **✦ Auto: avoid hazards** (a new press aborts the previous one). |
 | `POST` / `PUT` / `DELETE /api/routes…` | When you save or delete a route. |
 | `GET /api/features?bbox=…&limit=30` | When a route end is tapped, to snap it to a nearby label. |
 
@@ -275,6 +276,35 @@ colours (`map/routes.js`).
   desktop, lower half on phones); on phones the sidebar folds away when
   a route starts.
 
+### Automatic routes (Phase 4)
+
+The backend plans; the frontend only shows the answer
+(`hooks/useRoutePlan.js`, `components/RoutePanel.jsx` → `PlanCard`).
+
+- **✦ Auto: avoid hazards** (full-width button under the stats, ≥ 44 px
+  tall) sends A, B, the travel mode and the season to
+  `POST /api/routes/plan`. While it runs the button shows a spinner and
+  *Planning a safer route…* (`aria-busy`); another press, editing the
+  route, changing mode or closing it aborts the request.
+- On success the returned waypoints **replace** the draft's waypoints
+  (A and B stay), the route is marked unsaved and the map fits it. It is
+  an ordinary route: the usual live analysis colours it, and every
+  waypoint can be dragged, removed or added to as before; *Save route*
+  stores it like a hand-drawn one.
+- The **plan card** compares the result with the straight line
+  (distance, duration, max slope, warnings/dangers, both from the
+  backend), states the data, grid resolution, any coarsening and the
+  planning time, lists the backend's notes, and offers **Undo** (puts
+  back the waypoints from before the plan).
+- On failure the card shows the backend's message (for example *B is on
+  terrain too steep for on foot*, *No passable path…*, or the 180° /
+  polar / too-long limits). When the reachable area touched the edge of
+  the search area, a **Search a larger area** button retries with twice
+  the margin (`weights.marginFraction`, up to 3).
+- `client.js` turns a structured `422` (`detail = {reason, message, …}`)
+  into an `ApiError` whose `message` is the readable text and `info` the
+  whole object, so components never parse responses.
+
 ### Layout
 
 `components/Sidebar.jsx` has four tabs: **Layers**, **POIs**,
@@ -304,6 +334,14 @@ panel always ends above it.
 ---
 
 ## 4. Features
+
+Phase 4:
+
+- **✦ Auto: avoid hazards**: the backend plans a route that skips
+  impassable slopes and penalises steep or rough ground for the chosen
+  mode; its waypoints replace the current ones and stay draggable.
+- Plan card: comparison with the straight line, data and grid used,
+  timing, notes, Undo; clear errors with a *Search a larger area* retry.
 
 Phase 3:
 
@@ -369,7 +407,8 @@ frontend/
     │   ├── useLabelState.js  # which label groups are on (localStorage)
     │   ├── usePois.js        # POI list + create / update / delete
     │   ├── useRoutes.js      # saved routes + travel modes, create / update / delete
-    │   └── useRouteAnalysis.js # debounced live analysis of the route being edited
+    │   ├── useRouteAnalysis.js # debounced live analysis of the route being edited
+    │   └── useRoutePlan.js   # "Auto" planning request: loading, result / error, undo, abort
     ├── map/
     │   ├── crs.js            # Mars CRS (EPSG4326 grid + Mars radius), m/px helper
     │   ├── hash.js           # #zoom/lat/lon helpers
@@ -391,7 +430,7 @@ frontend/
         ├── PointPanel.jsx    # generic /api/point renderer (side panel / bottom sheet)
         ├── Sparkline.jsx     # tiny SVG curve for an item's series
         ├── RouteLayer.jsx    # route lines, coloured segments, handles, line dragging
-        ├── RoutePanel.jsx    # route details, stats, hazard list (side panel / bottom sheet)
+        ├── RoutePanel.jsx    # route details, stats, Auto button + plan card, hazard list
         ├── RouteProfile.jsx  # SVG elevation profile with hazard zones
         ├── RoutesPanel.jsx   # Routes tab (new route, saved list)
         ├── CoordinatesReadout.jsx
@@ -423,4 +462,6 @@ Rules of thumb for the team:
 | Taps on the map do nothing while a route is open | By design: the location panel is off while routing. Close the route (✕) to query points again. |
 | The route stays grey and dashed | It is being analysed, or the analysis failed: see the message in the panel (e.g. a route crossing 180° E/W is not supported). |
 | Dragging the line pans the map instead | Grab it within ~16 px of the line, or use the + handles. Only the route that is open can be edited. |
+| *✦ Auto* says "No passable path…" | A or B is boxed in by slopes over the mode's limit inside the search area. Press *Search a larger area* if offered, move B to gentler ground, or try the rover. |
+| *✦ Auto* returns an almost straight line | The straight line is already close to the cheapest path; the card still shows what changed. Drag waypoints to adjust. |
 | `npm install` fails on old Node | Install Node 20.19+ or 22.12+ (https://nodejs.org). |

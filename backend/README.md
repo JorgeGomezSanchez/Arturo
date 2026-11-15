@@ -10,8 +10,9 @@ that the frontend never sees.
 - Interactive API docs (Swagger) at **http://localhost:8000/docs** while it runs
 - Serves: map tiles for 16 Mars layers, layer metadata and legends, map
   labels (IAU names, landing sites, exploration zones), user points of
-  interest (POIs), exact values at any point (`/api/point`) and
-  hand-drawn routes with their hazard analysis (`/api/routes`).
+  interest (POIs), exact values at any point (`/api/point`),
+  hand-drawn routes with their hazard analysis (`/api/routes`) and
+  automatic hazard-avoiding routes (`/api/routes/plan`).
 
 ---
 
@@ -29,9 +30,10 @@ that the frontend never sees.
 10. [Points of interest (`/api/pois`)](#10-points-of-interest-apipois)
 11. [Point queries (`/api/point`)](#11-point-queries-apipoint)
 12. [Routes (`/api/routes`)](#12-routes-apiroutes)
-13. [Tests](#13-tests)
-14. [How to extend](#14-how-to-extend)
-15. [Troubleshooting](#15-troubleshooting)
+13. [Automatic route planning (`/api/routes/plan`)](#13-automatic-route-planning-apiroutesplan)
+14. [Tests](#14-tests)
+15. [How to extend](#15-how-to-extend)
+16. [Troubleshooting](#16-troubleshooting)
 
 ---
 
@@ -192,7 +194,8 @@ camelCase.
 | DELETE | `/api/routes/{id}` | Delete → `204`. |
 | GET | `/api/routes/{id}/analysis[?ls=]` | Full analysis of a saved route. |
 | POST | `/api/routes/analyze` | Analyse a line without saving it. Body: `{coordinates: [[lon, lat], …], mode, ls?}` (2–202 vertices). See [§12](#12-routes-apiroutes). |
-| GET | `/api/routes/config` | Travel modes, hazard thresholds and sampling settings (`routes.yaml`). |
+| POST | `/api/routes/plan` | Plan a hazard-avoiding route. Body: `{start: [lon, lat], end: [lon, lat], mode, ls?, weights?}` → `{waypoints, analysis, straight, info}`; `422` with `detail = {reason, message, …}` when no plan is possible. See [§13](#13-automatic-route-planning-apiroutesplan). |
+| GET | `/api/routes/config` | Travel modes, hazard thresholds, sampling and planning settings (`routes.yaml`). |
 
 Example `GET /api/layers` item:
 
@@ -232,8 +235,8 @@ and a debug header `X-Tile-Origin: remote | cache | local`.
 `/api/health` also reports `pointRaster`, e.g. `local GeoTIFF (6/7
 datasets) + remote 200 m DEM (USGS)`.
 
-Automatic route suggestions (least-cost paths over the same hazards)
-are planned for a later phase; Phase 3 analyses routes drawn by hand.
+Hand-drawn routes are analysed by `/api/routes/analyze`; automatic
+hazard-avoiding routes come from `/api/routes/plan` (Phase 4).
 
 ---
 
@@ -278,7 +281,8 @@ backend/
 │       ├── environment.py   # pressure, radiation, water boiling point
 │       ├── mars_time.py     # Ls, Mars Year, local solar time (Mars24)
 │       ├── geodesy.py       # great-circle distance and densification on the Mars sphere
-│       └── route_analysis.py # RouteAnalyzer: profile, stats, hazards, coloured segments
+│       ├── route_analysis.py # RouteAnalyzer: profile, stats, hazards, coloured segments
+│       └── route_planner.py # RoutePlanner: cost grid, GridPlanner (scikit-image), simplification
 ├── scripts/
 │   ├── prefetch_tiles.py    # builds offline tile packs
 │   ├── build_features.py    # rebuilds the label GeoJSON from USGS / Mars Trek
@@ -865,7 +869,127 @@ first time a live-DEM block is read. Endpoints are synchronous and run
 in FastAPI's thread pool; the frontend debounces and aborts requests
 while the user drags.
 
-## 13. Tests
+## 13. Automatic route planning (`/api/routes/plan`)
+
+Phase 4: given A, B and a travel mode, the backend finds a route that
+avoids impassable and difficult terrain and returns it as **ordinary
+waypoints** plus their normal analysis. Nothing in the route model
+changes: the frontend puts the waypoints in the draft and the route can
+be edited, saved and analysed like a hand-drawn one.
+
+### Request and response
+
+```jsonc
+// POST /api/routes/plan
+{ "start": [137.4417, -4.5895], "end": [137.55, -4.95], "mode": "walking",
+  "weights": { "marginFraction": 0.6 } }          // optional overrides
+
+// 200
+{
+  "waypoints": [[137.4293, -4.8609], [137.4833, -4.8947], [137.5306, -4.9284]],   // A and B excluded
+  "analysis": { /* same as POST /api/routes/analyze for [A, …waypoints, B] */ },
+  "straight": { "distanceM": 22306, "durationH": 18.7, "maxSlopeDeg": 23.4,
+                "maxSeverity": "warning", "hazardCounts": { "info": 5, "warning": 5, "danger": 0 } },
+  "info": {
+    "planner": "scikit-image MCP_Geometric (Dijkstra, 8-connected)",
+    "data": "200 m/px HRSC+MOLA blended DEM v2 (local detail-zone crop) (100 %)",
+    "resolutionM": 200, "nativeResolutionM": 200, "coarsened": 1, "rows": 171, "cols": 97,
+    "excludedShare": 0.007, "pathCells": 117, "estimatedHours": 20.8,
+    "elapsedMs": 1052, "timingsMs": { "grid": 29, "search": 4, "simplify": 4, "analysis": 1016 },
+    "notes": []
+  }
+}
+```
+
+Failures are `422` with a structured `detail`:
+
+| `reason` | When | Extra fields |
+|---|---|---|
+| `no_path` | B cannot be reached inside the search area | `closestReachable` [lon, lat], `gapM`, `impassableShare`, `noDataShare`, `limitDeg`, `reachableTouchesEdge` (a larger `marginFraction` may help), `marginFraction` |
+| `a_blocked` / `b_blocked` | A or B itself is on impassable slope or has no data | `slopeDeg`, `limitDeg` |
+| `no_data` | No elevation data in the area | — |
+| `antimeridian` | A and B on both sides of ±180° | — |
+| `polar` | The search area goes beyond `max_abs_lat` (80°) | `maxAbsLat` |
+| `too_long` | A–B farther apart than `max_distance_km` (600 km) | `distanceM`, `limitM` |
+| `same_point`, `unknown_mode`, `invalid` | Bad input | — |
+
+### Method (`services/route_planner.py`)
+
+1. **Search area**: the A–B bounding box grown on every side by
+   `margin_fraction` (0.3) of the route's larger side, at least
+   `min_margin_km` (2 km), so detours fit. Clipped at ±180°.
+2. **Grid**: every elevation block of the area is read through the
+   `RasterSource` stack, exactly as for analysis (Gale/Jezero 200 m
+   crops, the live USGS 200 m DEM in Earth mode within its row limits,
+   MOLA ~3.7 km). Slope (Horn) and roughness (scaled to a 1 km window,
+   as in the analysis) are computed on each **native** block, then the
+   blocks are composited on a lattice at the finest resolution found, in
+   source priority order. If the lattice exceeds `max_cells` (10⁶) it is
+   coarsened k×k and each cell keeps the **steepest** slope / roughest
+   value of its block, so coarsening never hides an impassable pixel.
+   `info.coarsened` and a note say so.
+3. **Cost** (seconds per metre of a cell):
+   `3.6 / speed_kmh / factor(slope) × penalties`, where `factor` is the
+   same speed model as the analysis: Tobler `exp(−3.5·tan s)` on foot
+   (normalised to 1 on flat ground; the grid has no travel direction, so
+   the slope counts as uphill), `max(0.2, 1 − 0.8·s/impassable)` for the
+   rover. Penalties: × `difficult_multiplier` (3) at or above the mode's
+   difficult slope (15°); × 1.5 / × 4 at the roughness warning / danger
+   thresholds. **Excluded** (infinite cost): slope ≥ the mode's
+   impassable slope (25°), `impassable_buffer_px` (1) pixels of clearance
+   around those cells (cleared again around A and B), and cells without
+   data (`no_data: impassable`; `penalty` makes them × 5 instead).
+4. **Search**: `GridPlanner.search(cost, start, end, sampling)`. The
+   default `SkimageMcpPlanner` uses `skimage.graph.MCP_Geometric` with
+   `fully_connected=True` and the metric pixel size as `sampling`, i.e.
+   Dijkstra on 8 neighbours where an edge costs the mean of its two cells
+   × its length (diagonals √2). Another algorithm (e.g. an A* with
+   direction-aware edge costs) only needs to implement `search()`.
+5. **Simplification**: greedy line of sight along the pixel path: from
+   the current vertex, extend the straight shortcut as far as it (a)
+   crosses no excluded cell and (b) costs at most
+   (1 + `simplify_cost_tolerance`) × the pixel path it replaces (5 %).
+   If that leaves more than `max_waypoints` (25), the tolerance is
+   doubled until it fits (noted in the response).
+6. **Analysis**: `[A, …waypoints, B]` and the straight line go through
+   `RouteAnalyzer`, so the planned route reports the same hazards,
+   profile and coloured segments as a hand-drawn one.
+
+All settings live in `app/catalog/routes.yaml` → `planning` (commented)
+and are exposed in `/api/routes/config`; `weights` overrides
+`marginFraction`, `difficultMultiplier`, `roughnessWarningMultiplier`,
+`roughnessDangerMultiplier`, `impassableBufferPx`, `noData`,
+`simplifyCostTolerance` and `maxWaypoints` per request.
+
+### Performance (Gale, 200 m local crop)
+
+| Route | Grid | Search | Total (incl. two analyses) |
+|---|---|---|---|
+| Curiosity → foothills (12.7 km) | 100×50, 8 ms | 2 ms | ~25 ms warm, ~0.6 s cold |
+| Curiosity → Mount Sharp (22 km) | 171×97, 20–30 ms | 3–5 ms | ~1.1 s (the analyses' thermal model dominates) |
+| Olympus Mons flank (245 km, MOLA) | 61×103, 10 ms | 2 ms | ~1.6 s |
+
+The search itself is milliseconds; the cost is in reading rasters and
+in the two analyses. A 1000×1000 grid (the `max_cells` cap) searches in
+~0.7 s on the development machine.
+
+### Limitations
+
+- **Isotropic cost**: uphill and downhill cost the same, and the grade
+  along the path is not known while searching (the analysis computes it
+  afterwards, so a planned route can still show *steep climb* warnings).
+- **Only terrain** enters the cost: slope, roughness, no data. Cold,
+  dust, radiation, soft ground and crater rims are reported by the
+  analysis but not avoided yet.
+- **Equirectangular grid**: one east–west pixel length (cosine of the
+  middle latitude) for the whole area; hence the ±80° and 600 km limits.
+- **DEM resolution**: on MOLA a 3.7 km cell can look passable while
+  hiding cliffs; the response always states the resolution used. The
+  live remote DEM is only used for areas within its row limits
+  (otherwise MOLA), as in the analysis.
+- **Waypoints at pixel centres**: snapped to the grid (± half a pixel).
+
+## 14. Tests
 
 ```bash
 pip install -r requirements-dev.txt
@@ -901,9 +1025,20 @@ validation errors (one vertex, zero length, unknown mode), the
 great-circle helpers, memory/JSON route stores (restart) and the full
 CRUD contract (201 + LineString + stats, PUT re-analyses, 204, 404).
 
+`tests/test_planner.py` writes a fixture DEM with a north–south **ridge
+of 40° flanks** (impassable on foot) and one **flat pass**: the planned
+route must cross the ridge inside the pass, stay below 25°, be longer
+than the straight line and save as a normal route, on foot and by
+rover. It also checks `no_path` when the pass is outside a small search
+area (reachable area touching the edge), blocked A/B on the flank, the
+antimeridian / too-long / polar / same-point / unknown-mode / invalid
+weights refusals, coarsening of large areas (and a straight result on
+flat ground), the scikit-image planner on a toy grid and the Tobler
+speed factor.
+
 ---
 
-## 14. How to extend
+## 15. How to extend
 
 ### Add a new raster layer (e.g. MOLA hillshade, THEMIS)
 
@@ -955,9 +1090,17 @@ A new hazard type: compute its per-sample values in
 title_fn, description_fn, unit, threshold)`; it appears in the list, the
 profile and the line colours with no frontend change.
 
+### Replace the path-finding algorithm
+
+Subclass `GridPlanner` (`services/route_planner.py`) and implement
+`search(cost, start, end, sampling) -> (GridPath | None, cumulative)`,
+then pass it to `RoutePlanner(analyzer, planner=MyPlanner())` in
+`main.py`. The grid, simplification, analysis, API and frontend stay the
+same.
+
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -977,5 +1120,9 @@ profile and the line colours with no frontend change.
 | Point panel slow (1–2 s) in Earth mode away from Gale/Jezero | That is the live 200 m DEM over HTTP. Set `POINT_REMOTE_DEM=false` to use the local MOLA grid only, or build a local crop with `build_rasters.py --only elevation --zones <zone>`. |
 | Route analysis says MOLA ~3.7 km although I am in Earth mode | The route's DEM block is too tall for the live 200 m DEM (≥ ~80 rows / ~30 km N–S). Split it, or build a local 200 m crop with `build_rasters.py --only elevation --zones <zone>`. |
 | `422` "routes crossing the ±180° meridian are not supported yet" | Not supported yet: split the route at 180°. |
+| `ModuleNotFoundError: skimage` (or `scipy`) | `pip install -r requirements.txt` (Phase 4 added scikit-image and scipy; wheels exist for Python 3.10–3.14). |
+| Auto route: "B is on terrain too steep…" | B (or A) sits on a slope at or above the mode's impassable limit: move it a little, or plan by rover if its limits differ. |
+| Auto route: "No passable path… touches the edge of the search area" | Press *Search a larger area* (or send `weights.marginFraction` > 0.3). |
+| Auto route looks almost straight | The straight line is already near the cheapest path for the configured weights; raise `difficult_multiplier` to prefer gentler detours. |
 | Routes vanish on restart | `ROUTE_STORE=memory` is set; use `json`. |
 | A few CTX tiles near 80–88° N/S return 404 | Upstream sends some of them truncated; the backend treats them as no data so the Viking layer shows through. |
