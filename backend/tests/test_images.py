@@ -11,6 +11,7 @@ from app.services.images import (
     composite_truncated,
     decode_image,
     descendant_from_ancestor,
+    is_cacheable,
     is_complete_png,
     last_decoded_row,
 )
@@ -97,3 +98,18 @@ def test_composite_truncated_keeps_native_top_and_fills_the_bottom():
     out = composite_truncated(partial, fill)
     assert out.getpixel((16, 5)) == 80
     assert out.getpixel((16, 20)) == 200
+
+
+def test_is_cacheable_accepts_complete_images_only():
+    complete = _png(Image.new("L", (16, 16), 80), compress_level=0)
+    assert is_cacheable(complete)
+    assert not is_cacheable(_truncate_png(complete))
+    assert not is_cacheable(b"")
+    assert not is_cacheable(b"\x89PNG\r\n\x1a\n" + b"nope")
+    # JPEG must have SOI and EOI and actually decode.
+    import io as _io
+    buf = _io.BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buf, format="JPEG")
+    jpeg = buf.getvalue()
+    assert is_cacheable(jpeg)
+    assert not is_cacheable(jpeg[:-2])  # drop EOI / trailing bytes
