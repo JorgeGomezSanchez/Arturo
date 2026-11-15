@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import struct
 
 from PIL import Image
 
@@ -57,9 +58,11 @@ def test_ctx_nodata_becomes_transparent(client):
     assert img.getpixel((400, 400))[-1] == 255  # data -> opaque
 
 
-def test_truncated_ctx_tile_is_404_not_500(client, tiles_dir):
-    good = (tiles_dir / "ctx_global_5m" / "3" / "4" / "2.png").read_bytes()
-    (tiles_dir / "ctx_global_5m" / "3" / "4" / "3.png").write_bytes(good[: len(good) // 2])
+def test_unreadable_ctx_tile_is_404_not_500(client, tiles_dir):
+    # Signature looks like a PNG but the payload is junk: still a 404, not a 500.
+    (tiles_dir / "ctx_global_5m" / "3" / "4" / "3.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n" + b"this is not a PNG"
+    )
     assert client.get("/api/tiles/ctx_global_5m/3/4/3").status_code == 404
 
 
@@ -79,3 +82,85 @@ def test_map_exposes_label_credits(client):
     credits = client.get("/api/map").json()["labelCredits"]
     assert set(credits) == {"names", "landing_site", "exploration_zone"}
     assert "IAU" in credits["names"]
+
+
+def _truncate_png(data: bytes) -> bytes:
+    """Drop IEND and cut the last IDAT so the file is incomplete."""
+    pos = 8
+    out = data[:8]
+    last_idat_at = None
+    while pos + 8 <= len(data):
+        length = struct.unpack(">I", data[pos:pos + 4])[0]
+        ctype = data[pos + 4:pos + 8]
+        end = pos + 8 + length + 4
+        if ctype == b"IEND":
+            break
+        if ctype == b"IDAT":
+            last_idat_at = len(out)
+        out += data[pos:end]
+        pos = end
+    if last_idat_at is None:
+        return out[: max(len(out) // 2, 16)]
+    last_len = struct.unpack(">I", out[last_idat_at:last_idat_at + 4])[0]
+    return out[: last_idat_at + 8 + max(last_len // 2, 1)]
+
+
+def test_truncated_tile_is_filled_from_parent(client, tiles_dir):
+    """A truncated CTX tile is repaired with the parent and served as 200.
+
+    Parent 4/0/0 has a distinctive bottom-right quadrant (value 180).
+    Child 5/1/1 is that quadrant; its PNG is cut short so only the top
+    rows decode. The response must keep those native rows and fill the
+    rest from the upscaled parent (180), then make no-data transparent
+    only where pixels are actually 0.
+    """
+    parent = Image.new("L", (512, 512), 80)
+    parent.paste(180, (256, 256, 512, 512))
+    parent_dir = tiles_dir / "ctx_global_5m" / "4" / "0"
+    parent_dir.mkdir(parents=True)
+    parent.save(parent_dir / "0.png")
+
+    # Weakly compressible so cutting the last IDAT drops many rows.
+    child = Image.new("L", (512, 512))
+    pix = child.load()
+    for y in range(512):
+        for x in range(512):
+            pix[x, y] = 40 + ((x + y * 3) % 80)
+    buf = io.BytesIO()
+    child.save(buf, format="PNG")
+    child_dir = tiles_dir / "ctx_global_5m" / "5" / "1"
+    child_dir.mkdir(parents=True)
+    (child_dir / "1.png").write_bytes(_truncate_png(buf.getvalue()))
+
+    r = client.get("/api/tiles/ctx_global_5m/5/1/1")
+    assert r.status_code == 200, r.text
+    img = Image.open(io.BytesIO(r.content))
+    img.load()
+    # Re-encoded, well-formed PNG the browser can display.
+    assert img.format == "PNG"
+    # Top: recovered native data (around 40-119), not the parent fill.
+    top = img.convert("L").getpixel((256, 4))
+    assert 40 <= top <= 119, top
+    # Bottom: filled from the parent's SE quadrant (180). Alpha is opaque
+    # because 180 is not nodata.
+    bottom = img.convert("LA").getpixel((256, 500))
+    assert abs(bottom[0] - 180) <= 5, bottom
+    assert bottom[1] == 255
+    assert r.headers["x-tile-origin"].endswith("+parent")
+
+
+def test_missing_tile_is_synthesized_from_parent(client, tiles_dir):
+    """A tile that is not in the pack is upscaled from its parent (200)."""
+    parent = Image.new("L", (512, 512), 90)
+    parent.paste(150, (0, 0, 256, 256))  # NW quadrant
+    parent_dir = tiles_dir / "ctx_global_5m" / "4" / "0"
+    parent_dir.mkdir(parents=True)
+    parent.save(parent_dir / "0.png")
+
+    r = client.get("/api/tiles/ctx_global_5m/5/0/0")
+    assert r.status_code == 200
+    img = Image.open(io.BytesIO(r.content))
+    img.load()
+    # Child 5/0/0 is the NW quadrant of 4/0/0, so ~150.
+    value = img.convert("L").getpixel((256, 256))
+    assert abs(value - 150) <= 5, value

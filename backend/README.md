@@ -175,7 +175,7 @@ camelCase.
 | GET | `/api/map` | Map configuration: body, Mars radius, CRS, initial view, zoom limits, bounds. |
 | GET | `/api/layers` | List of layers, ready for Leaflet (see below). |
 | GET | `/api/layers/{layer_id}` | One layer (404 if unknown). |
-| GET | `/api/tiles/{layer_id}/{z}/{x}/{y}` | Tile image. `z` = native source level, `x` = column from -180°, `y` = row from +90°. 404 = no data there, 502 = the source failed. |
+| GET | `/api/tiles/{layer_id}/{z}/{x}/{y}` | Tile image. `z` = native source level, `x` = column from -180°, `y` = row from +90°. 404 = no data there (and no parent tile to upscale). 502 = the source failed and the tile could not be repaired. |
 | GET | `/api/zones` | Detail zones for the side menu. |
 | GET | `/api/features` | Map labels as a GeoJSON FeatureCollection. Query: `bbox=west,south,east,north` (degrees; `west > east` crosses the ±180° line), `zoom` (required), `categories` (comma list, optional), `limit` (1–5000, default 500). Only features whose `minZoom ≤ zoom` are returned, most important first; `total` = how many matched before `limit`. See [§9](#9-map-labels-apifeatures). |
 | GET | `/api/features/categories` | Label categories (`crater`, `vallis`, `landing_site`, …) with a readable label and a count. |
@@ -305,9 +305,22 @@ GET /api/tiles/ctx_global_5m/9/902/269
         └─ TileProvider      (chosen by DATA_SOURCE at startup)
            ├─ CachedTileProvider → on disk? return it : ask inner + save
            │    └─ RemoteTileProvider → GET astro.arcgis.com/.../9/269/902
+           │         (retries transient 5xx / timeouts)
            └─ LocalTileProvider  → read data/tiles/ctx_global_5m/9/902/269.png
+        └─ repair            (truncated/missing tile: fill from parent)
         └─ transforms        (CTX: black no-data pixels → transparent)
 ```
+
+The Esri OnMars/CTX service (the high-resolution base imagery) sometimes
+returns HTTP 200 with a truncated or corrupt PNG, or a persistent HTTP
+500, for a handful of tiles. Those used to surface as 404s and 502s and
+left a hole filled only by the low-resolution Viking mosaic. The tile
+service now retries the upstream request and, if the tile is still
+missing or only partially decodable, upscales the nearest complete
+ancestor (parent / grandparent / …) and composites any recovered native
+rows on top. The cache stores the original upstream bytes, so a later
+fixed tile is picked up on a cache miss / eviction; the repaired image
+is built per request.
 
 ### The provider interface
 
@@ -322,8 +335,11 @@ class TileProvider(ABC):
 ```
 
 - `TileNotFoundError` → HTTP 404 ("no data here"; the map just shows the
-  layer underneath).
-- `TileProviderError` → HTTP 502 ("the source failed").
+  layer underneath). Raised after the service has already tried to
+  synthesize the tile from a parent.
+- `TileProviderError` → HTTP 502 ("the source failed"). Persistent 5xx
+  from a single tile are converted to "not found" after retries so the
+  service can fall back to a parent instead of 502-ing the viewer.
 
 The **only** place that decides which implementation to use is
 `providers/factory.py`:
