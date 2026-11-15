@@ -281,9 +281,9 @@ class RoutePlanner:
         r, c = cell
         ex = surf.excluded[r, c]
         if ex == EXCLUDED_SLOPE:
-            raise RoutePlanningError(f"{which}_blocked", f"{which.upper()} is on terrain steeper than the "
-                                     f"{mode.label.lower()} limit ({surf.slope[r, c]:.0f}° ≥ "
-                                     f"{mode.slope.impassable_deg:g}°). Move it to gentler ground.",
+            raise RoutePlanningError(f"{which}_blocked", f"{which.upper()} is on terrain too steep for "
+                                     f"{mode.label} ({surf.slope[r, c]:.0f}° ≥ {mode.slope.impassable_deg:g}°). "
+                                     "Move it to gentler ground.",
                                      slopeDeg=float(surf.slope[r, c]), limitDeg=mode.slope.impassable_deg)
         if ex == EXCLUDED_NO_DATA:
             raise RoutePlanningError(f"{which}_blocked", f"There is no elevation data at {which.upper()}.")
@@ -308,7 +308,7 @@ class RoutePlanner:
         steep = float((surf.excluded == EXCLUDED_SLOPE).mean())
         nod = float((surf.excluded == EXCLUDED_NO_DATA).mean())
         cause = "slopes ≥ {:g}°".format(mode.slope.impassable_deg) if steep >= nod else "missing elevation data"
-        msg = (f"No passable path for {mode.label.lower()} inside the search area: B is cut off by {cause}. "
+        msg = (f"No passable path ({mode.label}) inside the search area: B is cut off by {cause}. "
                f"The closest reachable point is {fmt_km(float(dist[i]))} from B.")
         if touches:
             msg += " The reachable area touches the edge of the search area: a larger margin may find a way around."
