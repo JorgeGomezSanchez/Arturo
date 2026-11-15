@@ -26,6 +26,7 @@ from app.repositories.pois import build_poi_repository
 from app.repositories.routes import build_route_repository
 from app.services.point import PointService
 from app.services.route_analysis import RouteAnalyzer
+from app.services.route_planner import RoutePlanner
 from app.services.tiles import TileService
 
 settings = get_settings()
@@ -60,6 +61,9 @@ async def lifespan(app: FastAPI):
     app.state.route_analyzer = RouteAnalyzer(
         datasets, app.state.feature_repository, load_routes_config(settings.routes_file)
     )
+    # Automatic planning: least-cost path on the same rasters, analysed
+    # by the same analyser (the planner algorithm is swappable).
+    app.state.route_planner = RoutePlanner(app.state.route_analyzer)
     yield
     await provider.close()
     for ds in datasets.values():

@@ -15,10 +15,12 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from app.models.route import (
-    AnalyzeRequest, RouteAnalysis, RouteFeature, RouteFeatureCollection, RouteInput, RoutesConfig, RouteStats,
+    AnalyzeRequest, PlanRequest, PlanResponse, RouteAnalysis, RouteFeature, RouteFeatureCollection, RouteInput,
+    RoutesConfig, RouteStats,
 )
 from app.repositories.routes import RouteNotFoundError, RouteRepository
 from app.services.route_analysis import RouteAnalysisError, RouteAnalyzer
+from app.services.route_planner import RoutePlanner, RoutePlanningError
 
 router = APIRouter(tags=["routes"])
 
@@ -63,6 +65,28 @@ def analyze_route(request: Request, body: AnalyzeRequest) -> RouteAnalysis:
     """Samples the line along great circles at the resolution of the best
     elevation data available and checks every hazard rule of routes.yaml."""
     return _analyze(request, body)
+
+
+@router.post("/routes/plan", response_model=PlanResponse, response_model_by_alias=True,
+             summary="Plan a hazard-avoiding route from A to B (least-cost path)",
+             responses={422: {"description": "No plan possible: `detail` = {reason, message, ...}. Reasons: "
+                                             "no_path, a_blocked, b_blocked, no_data, antimeridian, polar, "
+                                             "too_long, same_point, unknown_mode."}})
+def plan_route(request: Request, body: PlanRequest) -> PlanResponse:
+    """Builds a time-based cost grid from the DEM around A and B (Tobler /
+    rover slowdown from the terrain slope, penalties for difficult slope
+    and roughness, impassable slope and no-data excluded; all weights in
+    routes.yaml -> planning, overridable with `weights`), finds the
+    least-cost path, simplifies it into a few waypoints and analyses the
+    result like any manual route. The straight line is analysed too, for
+    comparison."""
+    planner: RoutePlanner = request.app.state.route_planner
+    try:
+        return planner.plan(body)
+    except RoutePlanningError as exc:
+        raise HTTPException(422, exc.info)
+    except RouteAnalysisError as exc:
+        raise HTTPException(422, {"reason": "invalid", "message": str(exc)})
 
 
 @router.get("/routes", response_model=RouteFeatureCollection, response_model_by_alias=True,
