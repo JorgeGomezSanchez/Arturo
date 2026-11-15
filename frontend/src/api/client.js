@@ -17,12 +17,17 @@ export function apiUrl(path) {
   return `${API_URL}${path}`
 }
 
-/** Error thrown for non-2xx answers; carries the HTTP status and detail. */
+/**
+ * Error thrown for non-2xx answers; carries the HTTP status, a readable
+ * `detail` string and, when the backend sent a structured detail
+ * ({reason, message, ...}, e.g. route planning), that object as `info`.
+ */
 export class ApiError extends Error {
-  constructor(method, path, status, detail) {
+  constructor(method, path, status, detail, info = null) {
     super(`${method} ${path} -> HTTP ${status}${detail ? `: ${detail}` : ''}`)
     this.status = status
     this.detail = detail
+    this.info = info
   }
 }
 
@@ -41,13 +46,18 @@ async function request(method, path, { body, signal, query } = {}) {
   })
   if (!res.ok) {
     let detail = ''
+    let info = null
     try {
       const payload = await res.json()
-      detail = typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail)
+      if (typeof payload.detail === 'string') detail = payload.detail
+      else if (payload.detail?.message) {
+        detail = payload.detail.message
+        info = payload.detail
+      } else detail = JSON.stringify(payload.detail)
     } catch {
       /* not JSON */
     }
-    throw new ApiError(method, path, res.status, detail)
+    throw new ApiError(method, path, res.status, detail, info)
   }
   return res.status === 204 ? null : res.json()
 }
@@ -146,3 +156,14 @@ export const deleteRoute = (id) => request('DELETE', `/api/routes/${encodeURICom
  */
 export const analyzeRoute = ({ coordinates, mode, ls }, signal) =>
   request('POST', '/api/routes/analyze', { body: { coordinates, mode, ls }, signal })
+
+/**
+ * Plan a hazard-avoiding route (least-cost path on the backend).
+ * start/end = [lon, lat]; weights = optional overrides of routes.yaml ->
+ * planning (e.g. { marginFraction: 0.6 }). Returns { waypoints, analysis,
+ * straight, info }. On failure the ApiError carries `info` = { reason,
+ * message, ... } (reasons: no_path, a_blocked, b_blocked, no_data,
+ * antimeridian, polar, too_long, same_point, unknown_mode).
+ */
+export const planRoute = ({ start, end, mode, ls, weights }, signal) =>
+  request('POST', '/api/routes/plan', { body: { start, end, mode, ls, weights }, signal })
