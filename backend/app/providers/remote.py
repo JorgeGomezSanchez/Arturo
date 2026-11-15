@@ -28,6 +28,23 @@ log = logging.getLogger(__name__)
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
+
+def _body_matches_content_length(resp: httpx.Response) -> bool:
+    """False if the server advertised a length and we got fewer bytes.
+
+    A dropped connection can otherwise yield a 200 whose body is a
+    truncated PNG/JPEG that we would have cached as if it were complete.
+    """
+    raw = resp.headers.get("Content-Length")
+    if raw is None:
+        return True
+    try:
+        expected = int(raw)
+    except ValueError:
+        return True
+    return expected == len(resp.content)
+
+
 class RemoteTileProvider(TileProvider):
     name = "remote"
 
@@ -101,6 +118,20 @@ class RemoteTileProvider(TileProvider):
                 raise TileProviderError(f"{url} -> HTTP {resp.status_code}")
 
             content = resp.content
+            if not _body_matches_content_length(resp):
+                log.warning(
+                    "%s Content-Length mismatch (header=%s, body=%s, attempt %s)",
+                    url, resp.headers.get("Content-Length"), len(content), attempt + 1,
+                )
+                if attempt < self._retries:
+                    await asyncio.sleep(self._retry_backoff_s * (2 ** attempt))
+                    continue
+                raise TileNotFoundError(
+                    f"{url} was truncated in transit "
+                    f"(Content-Length {resp.headers.get('Content-Length')}, "
+                    f"got {len(content)} bytes)"
+                )
+
             media_type = sniff_media_type(content, default="")
             if not media_type.startswith("image/"):
                 # A 200 HTML error page: retry once, then treat as missing.

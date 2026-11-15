@@ -102,6 +102,20 @@ def decode_image(data: bytes) -> tuple[Image.Image | None, bool]:
         return None, False
 
 
+def is_cacheable(data: bytes) -> bool:
+    """True if ``data`` is a well-formed, strictly decodable image.
+
+    Used by the disk cache: truncated or corrupt bytes (a cut-off
+    download, or a PNG that Esri serves without an IEND) must not be
+    written to disk, and a cached file that fails this check is evicted
+    and refetched.
+    """
+    if not data:
+        return False
+    image, complete = decode_image(data)
+    return image is not None and complete
+
+
 def last_decoded_row(image: Image.Image) -> int:
     """Index of the last row that is not entirely black (0), or -1.
 
