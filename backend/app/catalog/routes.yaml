@@ -27,6 +27,43 @@ sampling:
   # rest is interpolated.
   thermal_points: 16
 
+# Automatic route planning (POST /api/routes/plan): least-cost path on a
+# grid of the DEM around A and B. The cost of a cell is the TIME to cross
+# it (walking: Tobler's hiking function of the terrain slope; rover: the
+# linear slowdown of its mode), multiplied by the penalties below. Cells
+# at or above the mode's impassable slope, and cells without elevation
+# data, are excluded. Every value can be overridden per request
+# ("weights" in the body) to experiment from the API docs.
+planning:
+  # Search area: the A-B bounding box grown by this fraction of its size
+  # on every side (and at least min_margin_km), so detours fit.
+  margin_fraction: 0.3
+  min_margin_km: 2.0
+  # Largest grid searched. Bigger areas are coarsened (pixels merged,
+  # keeping the steepest slope of each block, so a coarse grid never
+  # hides an impassable cell). The response says the resolution used.
+  max_cells: 1000000
+  # Refuse routes longer than this (straight line) or reaching beyond
+  # this latitude: the lat/lon grid gets too distorted near the poles.
+  max_distance_km: 600
+  max_abs_lat: 80
+  # Cost multipliers.
+  difficult_multiplier: 3.0      # slope >= mode "difficult" (15 deg): slower AND riskier
+  roughness_warning_multiplier: 1.5   # roughness >= hazards.roughness_m.warning
+  roughness_danger_multiplier: 4.0    # roughness >= hazards.roughness_m.danger
+  # Keep this many pixels of clearance from impassable cells (the DEM is
+  # an average: the real ground next to a steep pixel is often steep too).
+  impassable_buffer_px: 1
+  # "impassable" excludes cells without elevation data; "penalty" lets
+  # the path cross them at no_data_multiplier x the flat-ground cost.
+  no_data: impassable
+  no_data_multiplier: 5.0
+  # Path simplification: a pixel staircase becomes a few waypoints. A
+  # shortcut is taken only if its straight line crosses no excluded cell
+  # and costs at most (1 + tolerance) x the pixel path it replaces.
+  simplify_cost_tolerance: 0.05
+  max_waypoints: 25
+
 modes:
   walking:
     label: "On foot (EVA suit)"

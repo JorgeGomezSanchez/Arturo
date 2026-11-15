@@ -16,3 +16,8 @@ pillow>=10.0                 # tile post-processing (e.g. transparent no-data ga
 # install needed: the wheel bundles it).
 rasterio>=1.4.3              # windowed GeoTIFF reads, local and over HTTP (/vsicurl/)
 numpy>=1.26                  # raster math (slope, roughness, thermal model)
+
+# --- Phase 4: automatic route planning ---
+# Wheels for CPython 3.10-3.14 on Linux, macOS and Windows.
+scikit-image>=0.25           # least-cost path search (skimage.graph.MCP_Geometric)
+scipy>=1.11                  # grid morphology (impassable buffer, block maximum); also needed by scikit-image

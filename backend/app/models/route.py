@@ -59,10 +59,29 @@ class SamplingConfig(_Camel):
     thermal_points: int = 16
 
 
+class PlanningConfig(_Camel):
+    """routes.yaml -> planning: automatic route planning (POST /api/routes/plan)."""
+
+    margin_fraction: float = Field(0.3, ge=0, le=3)
+    min_margin_km: float = Field(2.0, ge=0)
+    max_cells: int = Field(1_000_000, ge=100, le=16_000_000)
+    max_distance_km: float = Field(600, gt=0)
+    max_abs_lat: float = Field(80, gt=0, le=90)
+    difficult_multiplier: float = Field(3.0, ge=1)
+    roughness_warning_multiplier: float = Field(1.5, ge=1)
+    roughness_danger_multiplier: float = Field(4.0, ge=1)
+    impassable_buffer_px: int = Field(1, ge=0, le=10)
+    no_data: Literal["impassable", "penalty"] = "impassable"
+    no_data_multiplier: float = Field(5.0, ge=1)
+    simplify_cost_tolerance: float = Field(0.05, ge=0, le=1)
+    max_waypoints: int = Field(25, ge=0, le=200)
+
+
 class RoutesConfig(_Camel):
     """routes.yaml, also served as GET /api/routes/config."""
 
     sampling: SamplingConfig
+    planning: PlanningConfig = PlanningConfig()
     modes: dict[str, TravelMode]
     hazards: dict[str, dict[str, float | str]]
 
@@ -266,3 +285,73 @@ class RouteAnalysis(_Camel):
     vertices: list[tuple[float, float]]
     vertex_distances_m: list[float]
     method: str
+
+
+# --------------------------------------------------------------- planning
+class PlanWeights(_Camel):
+    """Optional per-request overrides of routes.yaml -> planning."""
+
+    margin_fraction: Optional[float] = Field(None, ge=0, le=3)
+    difficult_multiplier: Optional[float] = Field(None, ge=1)
+    roughness_warning_multiplier: Optional[float] = Field(None, ge=1)
+    roughness_danger_multiplier: Optional[float] = Field(None, ge=1)
+    impassable_buffer_px: Optional[int] = Field(None, ge=0, le=10)
+    no_data: Optional[Literal["impassable", "penalty"]] = None
+    simplify_cost_tolerance: Optional[float] = Field(None, ge=0, le=1)
+    max_waypoints: Optional[int] = Field(None, ge=0, le=200)
+
+
+class PlanRequest(_Camel):
+    """Body of POST /api/routes/plan."""
+
+    start: tuple[float, float] = Field(..., description="[lon, lat] of A")
+    end: tuple[float, float] = Field(..., description="[lon, lat] of B")
+    mode: str = "walking"
+    ls: Optional[float] = Field(None, ge=0, lt=360)
+    weights: Optional[PlanWeights] = None
+
+    @model_validator(mode="after")
+    def _check(self):
+        for lon, lat in (self.start, self.end):
+            if not -90 <= lat <= 90 or not -540 <= lon <= 540:
+                raise ValueError("coordinate out of range")
+        self.start = (_wrap(self.start[0]), self.start[1])
+        self.end = (_wrap(self.end[0]), self.end[1])
+        return self
+
+
+class RouteSummary(_Camel):
+    """A few numbers of an analysis, e.g. the straight line for comparison."""
+
+    distance_m: float
+    duration_h: float
+    max_slope_deg: Optional[float]
+    max_severity: SegmentLevel
+    hazard_counts: dict[str, int]
+
+
+class PlanInfo(_Camel):
+    """How the plan was computed (shown in the UI and the API docs)."""
+
+    planner: str
+    data: str  # DEM(s) used for the grid
+    resolution_m: float  # grid pixel size (after any coarsening)
+    native_resolution_m: float
+    coarsened: int  # 1 = native resolution, k = k x k pixels merged
+    rows: int
+    cols: int
+    excluded_share: float  # fraction of the grid that was impassable / no data
+    path_cells: int
+    estimated_hours: float  # from the cost surface (the analysis is authoritative)
+    elapsed_ms: int
+    timings_ms: dict[str, int]  # grid, search, simplify, analysis
+    notes: list[str]
+
+
+class PlanResponse(_Camel):
+    """Waypoints of the planned route (A and B excluded) + its analysis."""
+
+    waypoints: list[tuple[float, float]]
+    analysis: RouteAnalysis
+    straight: RouteSummary
+    info: PlanInfo
