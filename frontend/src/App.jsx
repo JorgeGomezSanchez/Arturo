@@ -21,6 +21,7 @@ import { useLabelState } from './hooks/useLabelState'
 import { useLayerState } from './hooks/useLayerState'
 import { usePois } from './hooks/usePois'
 import { useRouteAnalysis } from './hooks/useRouteAnalysis'
+import { useRoutePlan } from './hooks/useRoutePlan'
 import { useRoutes } from './hooks/useRoutes'
 import { defaultRouteName, routeCoordinates, snapRouteEnd, unwrapLine } from './map/routes'
 import './App.css'
@@ -86,6 +87,7 @@ function MapApp({ data }) {
   const routeDraft = routeUi?.mode === 'edit' ? routeUi.draft : null
   const routeCoords = useMemo(() => (routeDraft ? routeCoordinates(routeDraft) : null), [routeDraft])
   const analysis = useRouteAnalysis(routeCoords, routeDraft?.mode)
+  const planner = useRoutePlan()
   const routePicking = routeUi?.mode === 'pickA' ? 'A' : routeUi?.mode === 'pickB' ? 'B' : null
 
   const rules = data.mapConfig.poiVisibility
@@ -111,6 +113,7 @@ function MapApp({ data }) {
   // ---- routes ----
   const snapOpts = { pois: pois.pois, categories: labels.categories, labelsOn: labels.anyOn }
   const startRoute = () => {
+    planner.clear()
     setPointTarget(null)
     setPoiUi(null)
     setHazardId(null)
@@ -132,6 +135,7 @@ function MapApp({ data }) {
   const editDraft = (fn) => {
     setHazardId(null)
     setCursorD(null)
+    planner.clear() // a manual edit makes the plan summary stale
     setRouteUi((ui) => (ui?.mode === 'edit' ? { ...ui, draft: fn(ui.draft), dirty: true } : ui))
   }
   const moveVertex = async (index, latlng) => {
@@ -153,7 +157,26 @@ function MapApp({ data }) {
     })
   }
   const removeWaypoint = (i) => editDraft((d) => ({ ...d, waypoints: d.waypoints.filter((_, k) => k !== i) }))
+  // "Auto": replace the waypoints with a planned, hazard-avoiding path.
+  // They stay ordinary waypoints, so the route can still be dragged.
+  const autoPlan = (weights) => {
+    setHazardId(null)
+    setCursorD(null)
+    planner.run(routeDraft, {
+      weights,
+      onWaypoints: (waypoints) => {
+        setRouteUi((ui) => (ui?.mode === 'edit' ? { ...ui, draft: { ...ui.draft, waypoints }, dirty: true } : ui))
+        if (map) fitLine(map, routeCoordinates({ ...routeDraft, waypoints }), 13)
+      },
+    })
+  }
+  const undoPlan = () => {
+    const prev = planner.plan?.prevWaypoints
+    planner.clear()
+    if (prev) setRouteUi((ui) => (ui?.mode === 'edit' ? { ...ui, draft: { ...ui.draft, waypoints: prev }, dirty: true } : ui))
+  }
   const openRoute = (feature) => {
+    planner.clear()
     setPointTarget(null)
     setPoiUi(null)
     setHazardId(null)
@@ -180,6 +203,7 @@ function MapApp({ data }) {
   }
   const closeRoute = () => {
     if (routeUi?.dirty && !window.confirm('Discard the changes to this route?')) return
+    planner.clear()
     setRouteUi(null)
     setHazardId(null)
     setCursorD(null)
@@ -382,7 +406,14 @@ function MapApp({ data }) {
           analysis={analysis}
           selectedHazardId={hazardId}
           cursorD={cursorD}
-          onChange={(patch) => setRouteUi((ui) => ({ ...ui, draft: { ...ui.draft, ...patch }, dirty: true }))}
+          onChange={(patch) => {
+            if (patch.mode) planner.clear()
+            setRouteUi((ui) => ({ ...ui, draft: { ...ui.draft, ...patch }, dirty: true }))
+          }}
+          plan={planner.plan}
+          planDefaults={routes.config?.planning}
+          onAutoPlan={autoPlan}
+          onUndoPlan={undoPlan}
           onSelectHazard={selectHazard}
           onCursor={setCursorD}
           onSave={saveRoute}

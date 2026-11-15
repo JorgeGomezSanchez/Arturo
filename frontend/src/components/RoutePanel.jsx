@@ -30,6 +30,60 @@ function HazardItem({ h, selected, onSelect }) {
   )
 }
 
+function countsText(c) {
+  const parts = ['danger', 'warning', 'info'].filter((k) => c?.[k]).map((k) => `${c[k]} ${k}`)
+  return parts.length ? parts.join(', ') : 'no hazards'
+}
+
+/** Result (or failure) of the last automatic plan, with Undo / retry. */
+function PlanCard({ plan, defaults, onRetry, onUndo }) {
+  if (!plan || plan.status === 'loading') return null
+  if (plan.status === 'error') {
+    const info = plan.error?.info
+    const margin = info?.marginFraction ?? defaults?.marginFraction ?? 0.3
+    return (
+      <div className="plan-card error" role="alert">
+        <strong>No automatic route</strong>
+        <p>{info?.message ?? plan.error?.detail ?? plan.error?.message}</p>
+        {info?.reason === 'no_path' && info.reachableTouchesEdge && margin < 3 && (
+          <button className="btn" onClick={() => onRetry({ marginFraction: Math.min(3, margin * 2) })}>
+            Search a larger area
+          </button>
+        )}
+      </div>
+    )
+  }
+  const { result } = plan
+  const { info, straight, analysis } = result
+  return (
+    <div className="plan-card" role="status">
+      <strong>
+        Auto route: {result.waypoints.length} waypoint{result.waypoints.length === 1 ? '' : 's'}
+      </strong>
+      <p className="small">
+        {formatKm(analysis.distanceM)}, {countsText(analysis.hazardCounts)}, max slope{' '}
+        {analysis.maxSlopeDeg?.toFixed(1)}°.
+        <br />
+        Straight line: {formatKm(straight.distanceM)}, {countsText(straight.hazardCounts)}, max slope{' '}
+        {straight.maxSlopeDeg?.toFixed(1)}°.
+      </p>
+      <p className="muted small">
+        Least-cost search on {Math.round(info.resolutionM)} m data ({info.rows}×{info.cols} cells
+        {info.coarsened > 1 ? `, coarsened ${info.coarsened}×` : ''}) in {(info.elapsedMs / 1000).toFixed(1)} s. The
+        waypoints are normal ones: drag them to adjust.
+      </p>
+      {info.notes.map((n) => (
+        <p key={n} className="muted small">
+          {n}
+        </p>
+      ))}
+      <button className="btn" onClick={onUndo}>
+        Undo
+      </button>
+    </div>
+  )
+}
+
 /**
  * Details of the route being created or edited: name, travel mode,
  * notes, summary statistics, elevation profile and the hazard list (tap
@@ -45,6 +99,10 @@ export default function RoutePanel({
   selectedHazardId,
   cursorD,
   onChange,
+  plan,
+  planDefaults,
+  onAutoPlan,
+  onUndoPlan,
   onSelectHazard,
   onCursor,
   onSave,
@@ -186,6 +244,21 @@ export default function RoutePanel({
                 ))}
               </select>
             </label>
+            <button
+              className="btn auto wide"
+              onClick={() => onAutoPlan()}
+              disabled={plan?.status === 'loading'}
+              aria-busy={plan?.status === 'loading'}
+            >
+              {plan?.status === 'loading' ? (
+                <>
+                  <span className="spinner" /> Planning a safer route…
+                </>
+              ) : (
+                '✦ Auto: avoid hazards'
+              )}
+            </button>
+            <PlanCard plan={plan} defaults={planDefaults} onRetry={onAutoPlan} onUndo={onUndoPlan} />
             <div className="route-actions">
               <button className="btn primary" onClick={save} disabled={busy || !draft.name.trim() || (saved && !dirty)}>
                 {saved ? (dirty ? 'Save changes' : 'Saved') : 'Save route'}
